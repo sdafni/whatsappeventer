@@ -125,7 +125,7 @@ class OverlayService : Service() {
     private fun isWhatsAppInForeground(): Boolean {
         try {
             val endTime = System.currentTimeMillis()
-            val beginTime = endTime - 20000 // Check last 20 seconds for much better reliability
+            val beginTime = endTime - 30000 // Check last 30 seconds for much better reliability
             
             // Use queryUsageStats with multiple time windows for better detection
             val usageStats = usageStatsManager.queryUsageStats(
@@ -146,10 +146,10 @@ class OverlayService : Service() {
             
             val isWhatsApp = lastUsedApp == WHATSAPP_PACKAGE
             
-            // Smart persistence logic: if overlay is visible and WhatsApp was recently active, keep it much longer
+            // Enhanced persistence logic: if overlay is visible and WhatsApp was recently active, keep it much longer
             if (isWhatsApp && isOverlayVisible) {
                 val timeSinceLastUse = endTime - lastTimeUsed
-                if (timeSinceLastUse < 30000) { // Keep active for 30 seconds after last use
+                if (timeSinceLastUse < 45000) { // Keep active for 45 seconds after last use
                     android.util.Log.d("OverlayService", "WhatsApp recently active - keeping overlay visible (${timeSinceLastUse}ms ago)")
                     return true
                 }
@@ -158,7 +158,7 @@ class OverlayService : Service() {
             // Additional logic: if WhatsApp was detected recently, give it more time
             if (isWhatsApp) {
                 val timeSinceLastUse = endTime - lastTimeUsed
-                if (timeSinceLastUse < 12000) { // If WhatsApp was used in last 12 seconds, consider it active
+                if (timeSinceLastUse < 20000) { // If WhatsApp was used in last 20 seconds, consider it active
                     android.util.Log.d("OverlayService", "WhatsApp very recently active (${timeSinceLastUse}ms ago) - showing overlay")
                     return true
                 }
@@ -252,7 +252,7 @@ class OverlayService : Service() {
     
     private fun onOverlayButtonClick() {
         // Handle overlay button click
-        Toast.makeText(this, "WhatsApp Event Button Clicked!", Toast.LENGTH_SHORT).show()
+        android.util.Log.d("OverlayService", "Hi you! - Overlay button clicked!")
         
         // You can add your custom logic here
         // For example, open a specific activity or perform an action

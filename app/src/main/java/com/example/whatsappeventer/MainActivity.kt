@@ -1,5 +1,6 @@
 package com.example.whatsappeventer
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -117,6 +118,41 @@ class MainActivity : AppCompatActivity() {
         return mode == android.app.AppOpsManager.MODE_ALLOWED
     }
     
+    private fun isOverlayServiceRunning(): Boolean {
+        try {
+            val manager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            for (service in manager.getRunningServices(Integer.MAX_VALUE)) {
+                if (service.service.className == "com.example.whatsappeventer.OverlayService") {
+                    return true
+                }
+            }
+            return false
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error checking service status: ${e.message}")
+            return false
+        }
+    }
+    
+    private fun checkServiceStatus() {
+        try {
+            val isServiceRunning = isOverlayServiceRunning()
+            if (isServiceRunning != isOverlayRunning) {
+                isOverlayRunning = isServiceRunning
+                if (isOverlayRunning) {
+                    btnStartStop.text = getString(R.string.stop_overlay)
+                    tvStatus.text = "Status: ${getString(R.string.overlay_service_running)}"
+                    android.util.Log.d("MainActivity", "Service detected as running - updating UI to Stop Overlay")
+                } else {
+                    btnStartStop.text = getString(R.string.start_overlay)
+                    tvStatus.text = "Status: ${getString(R.string.overlay_service_stopped)}"
+                    android.util.Log.d("MainActivity", "Service detected as stopped - updating UI to Start Overlay")
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error in checkServiceStatus: ${e.message}")
+        }
+    }
+    
     private fun checkPermissions() {
         if (Settings.canDrawOverlays(this)) {
             btnOverlayPermission.text = "Overlay Permission: Granted"
@@ -145,5 +181,6 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         checkPermissions()
+        checkServiceStatus()
     }
 } 
