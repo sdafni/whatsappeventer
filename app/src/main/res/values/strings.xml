@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WhatsApp Eventer</string>
+    <string name="start_overlay">Start Overlay</string>
+    <string name="stop_overlay">Stop Overlay</string>
+    <string name="grant_overlay_permission">Grant Overlay Permission</string>
+    <string name="grant_usage_stats_permission">Grant Usage Stats Permission</string>
+    <string name="overlay_service_running">Overlay Service Running</string>
+    <string name="overlay_service_stopped">Overlay Service Stopped</string>
+</resources> 
