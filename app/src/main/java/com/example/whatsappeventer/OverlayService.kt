@@ -17,6 +17,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import java.util.*
 
 class OverlayService : Service() {
@@ -124,16 +125,15 @@ class OverlayService : Service() {
     private fun isWhatsAppInForeground(): Boolean {
         try {
             val endTime = System.currentTimeMillis()
-            val beginTime = endTime - 3000 // Check last 3 seconds for better reliability
+            val beginTime = endTime - 20000 // Check last 20 seconds for much better reliability
             
-            // Use queryUsageStats with a longer time window for better reliability
+            // Use queryUsageStats with multiple time windows for better detection
             val usageStats = usageStatsManager.queryUsageStats(
                 android.app.usage.UsageStatsManager.INTERVAL_DAILY,
                 beginTime,
                 endTime
             )
             
-            // Find the most recently used app
             var lastUsedApp = ""
             var lastTimeUsed = 0L
             
@@ -145,7 +145,26 @@ class OverlayService : Service() {
             }
             
             val isWhatsApp = lastUsedApp == WHATSAPP_PACKAGE
-            android.util.Log.d("OverlayService", "Detection result - app: $lastUsedApp, isWhatsApp: $isWhatsApp, timeWindow: ${endTime - beginTime}ms")
+            
+            // Smart persistence logic: if overlay is visible and WhatsApp was recently active, keep it much longer
+            if (isWhatsApp && isOverlayVisible) {
+                val timeSinceLastUse = endTime - lastTimeUsed
+                if (timeSinceLastUse < 30000) { // Keep active for 30 seconds after last use
+                    android.util.Log.d("OverlayService", "WhatsApp recently active - keeping overlay visible (${timeSinceLastUse}ms ago)")
+                    return true
+                }
+            }
+            
+            // Additional logic: if WhatsApp was detected recently, give it more time
+            if (isWhatsApp) {
+                val timeSinceLastUse = endTime - lastTimeUsed
+                if (timeSinceLastUse < 12000) { // If WhatsApp was used in last 12 seconds, consider it active
+                    android.util.Log.d("OverlayService", "WhatsApp very recently active (${timeSinceLastUse}ms ago) - showing overlay")
+                    return true
+                }
+            }
+            
+            android.util.Log.d("OverlayService", "Detection result - app: $lastUsedApp, isWhatsApp: $isWhatsApp, timeWindow: ${endTime - beginTime}ms, lastUse: ${endTime - lastTimeUsed}ms ago")
             return isWhatsApp
             
         } catch (e: Exception) {
