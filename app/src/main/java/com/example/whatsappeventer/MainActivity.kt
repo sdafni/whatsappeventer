@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val OVERLAY_PERMISSION_REQUEST_CODE = 1234
         private const val USAGE_STATS_PERMISSION_REQUEST_CODE = 5678
+        private const val STORAGE_PERMISSION_REQUEST_CODE = 9012
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +58,11 @@ class MainActivity : AppCompatActivity() {
         btnUsageStatsPermission.setOnClickListener {
             requestUsageStatsPermission()
         }
+        
+        // Add storage permission button if needed
+        if (!hasStoragePermissions()) {
+            requestStoragePermissions()
+        }
     }
     
     private fun startOverlay() {
@@ -67,6 +73,11 @@ class MainActivity : AppCompatActivity() {
         
         if (!hasUsageStatsPermission()) {
             tvStatus.text = "Status: Usage stats permission required"
+            return
+        }
+        
+        if (!hasStoragePermissions()) {
+            tvStatus.text = "Status: Storage permission required"
             return
         }
         
@@ -118,6 +129,37 @@ class MainActivity : AppCompatActivity() {
         return mode == android.app.AppOpsManager.MODE_ALLOWED
     }
     
+    private fun hasStoragePermissions(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+    }
+    
+    private fun requestStoragePermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.addCategory("android.intent.category.DEFAULT")
+                intent.data = Uri.parse("package:$packageName")
+                startActivityForResult(intent, STORAGE_PERMISSION_REQUEST_CODE)
+            } catch (e: Exception) {
+                val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                startActivityForResult(intent, STORAGE_PERMISSION_REQUEST_CODE)
+            }
+        } else {
+            requestPermissions(
+                arrayOf(
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ),
+                STORAGE_PERMISSION_REQUEST_CODE
+            )
+        }
+    }
+    
     private fun isOverlayServiceRunning(): Boolean {
         try {
             val manager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
@@ -163,6 +205,10 @@ class MainActivity : AppCompatActivity() {
             btnUsageStatsPermission.text = "Usage Stats Permission: Granted"
             btnUsageStatsPermission.isEnabled = false
         }
+        
+        if (hasStoragePermissions()) {
+            // Storage permission granted - no button needed
+        }
     }
     
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -173,6 +219,9 @@ class MainActivity : AppCompatActivity() {
                 checkPermissions()
             }
             USAGE_STATS_PERMISSION_REQUEST_CODE -> {
+                checkPermissions()
+            }
+            STORAGE_PERMISSION_REQUEST_CODE -> {
                 checkPermissions()
             }
         }

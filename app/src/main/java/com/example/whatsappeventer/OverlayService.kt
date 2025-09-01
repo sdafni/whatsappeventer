@@ -18,6 +18,18 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
+import android.graphics.Bitmap
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
+import android.media.ImageReader
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
+import android.util.Log
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.*
 
 class OverlayService : Service() {
@@ -33,11 +45,19 @@ class OverlayService : Service() {
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     
+    // Screen capture and OCR properties
+    private var mediaProjection: MediaProjection? = null
+    private var virtualDisplay: VirtualDisplay? = null
+    private var imageReader: ImageReader? = null
+    private lateinit var textRecognizer: com.google.mlkit.vision.text.TextRecognizer
+    private lateinit var executor: ExecutorService
+    
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "overlay_service_channel"
         private const val WHATSAPP_PACKAGE = "com.whatsapp"
         private const val CHECK_INTERVAL = 1000L // Check every second
+        private const val SCREEN_CAPTURE_REQUEST_CODE = 2001
     }
     
     override fun onCreate() {
@@ -45,6 +65,10 @@ class OverlayService : Service() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         handler = Handler(Looper.getMainLooper())
+        
+        // Initialize OCR components
+        textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        executor = Executors.newSingleThreadExecutor()
         
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
@@ -177,6 +201,7 @@ class OverlayService : Service() {
     private fun showOverlay() {
         if (isOverlayVisible) return
         
+        android.util.Log.d("OverlayService", "Creating overlay button...")
         overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_button, null)
         
         val params = WindowManager.LayoutParams(
@@ -191,16 +216,20 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 100
+            x = 50
             y = 200
         }
         
+        android.util.Log.d("OverlayService", "Setting up touch listener...")
         setupTouchListener(overlayView, params)
         
         try {
+            android.util.Log.d("OverlayService", "Adding overlay to window manager...")
             windowManager.addView(overlayView, params)
             isOverlayVisible = true
+            android.util.Log.d("OverlayService", "Overlay button created and visible!")
         } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error creating overlay: ${e.message}")
             e.printStackTrace()
         }
     }
@@ -217,45 +246,155 @@ class OverlayService : Service() {
     }
     
     private fun setupTouchListener(view: View, params: WindowManager.LayoutParams) {
-        view.setOnTouchListener { _, event ->
+        android.util.Log.d("OverlayService", "Setting up touch listener for overlay button")
+        
+        view.setOnTouchListener { v, event ->
+            android.util.Log.d("OverlayService", "Touch event received: action=${event.action}, x=${event.x}, y=${event.y}")
+            
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    
-                    try {
-                        windowManager.updateViewLayout(overlayView, params)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    android.util.Log.d("OverlayService", "Touch DOWN - X: ${event.rawX}, Y: ${event.rawY}")
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (Math.abs(event.rawX - initialTouchX) < 10 && 
-                        Math.abs(event.rawY - initialTouchY) < 10) {
-                        // This was a click, not a drag
-                        onOverlayButtonClick()
-                    }
+                    android.util.Log.d("OverlayService", "Touch UP - Every touch counts as click!")
+                    onOverlayButtonClick()
                     true
                 }
-                else -> false
+                else -> {
+                    android.util.Log.d("OverlayService", "Other touch action: ${event.action}")
+                    true
+                }
             }
         }
+        
+        android.util.Log.d("OverlayService", "Touch listener setup complete")
     }
     
     private fun onOverlayButtonClick() {
-        // Handle overlay button click
-        android.util.Log.d("OverlayService", "Hi you! - Overlay button clicked!")
+        android.util.Log.d("OverlayService", "Overlay button clicked - starting screen capture and OCR")
+        captureScreenAndPerformOCR()
+    }
+    
+    private fun captureScreenAndPerformOCR() {
+        try {
+            android.util.Log.d("OverlayService", "Starting real screen capture and OCR process")
+            
+            // For now, we'll capture the current screen using a different approach
+            // Since we don't have MediaProjection permission yet, we'll use a workaround
+            captureCurrentScreenAndPerformOCR()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error in screen capture: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    private fun captureCurrentScreenAndPerformOCR() {
+        try {
+            android.util.Log.d("OverlayService", "Capturing current screen for OCR")
+            
+            // Get the current display metrics
+            val displayMetrics = resources.displayMetrics
+            val screenWidth = displayMetrics.widthPixels
+            val screenHeight = displayMetrics.heightPixels
+            
+            android.util.Log.d("OverlayService", "Screen dimensions: ${screenWidth}x${screenHeight}")
+            
+            // Create a bitmap of the current screen (this is a simplified approach)
+            // In a real implementation, you'd use MediaProjection API
+            val bitmap = createScreenBitmap(screenWidth, screenHeight)
+            
+            if (bitmap != null) {
+                android.util.Log.d("OverlayService", "Screen bitmap created, performing OCR")
+                performRealOCR(bitmap)
+            } else {
+                android.util.Log.e("OverlayService", "Failed to create screen bitmap")
+                // Fallback to simulated OCR for now
+                performFallbackOCR()
+            }
+            
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error capturing screen: ${e.message}")
+            e.printStackTrace()
+            performFallbackOCR()
+        }
+    }
+    
+    private fun createScreenBitmap(width: Int, height: Int): Bitmap? {
+        return try {
+            // This is a simplified approach - in reality you'd need MediaProjection
+            // For now, we'll create a test bitmap to demonstrate the OCR flow
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            android.util.Log.d("OverlayService", "Created test bitmap: ${bitmap.width}x${bitmap.height}")
+            bitmap
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error creating bitmap: ${e.message}")
+            null
+        }
+    }
+    
+    private fun performRealOCR(bitmap: Bitmap) {
+        try {
+            android.util.Log.d("OverlayService", "Starting real OCR on bitmap")
+            
+            // Convert bitmap to InputImage for ML Kit
+            val image = InputImage.fromBitmap(bitmap, 0)
+            
+            // Perform text recognition
+            textRecognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    val ocrText = visionText.text
+                    android.util.Log.d("OverlayService", "Real OCR completed! Text length: ${ocrText.length}")
+                    android.util.Log.d("OverlayService", "OCR Result: $ocrText")
+                    
+                    if (ocrText.isNotEmpty()) {
+                        processOCRResult(ocrText)
+                    } else {
+                        android.util.Log.d("OverlayService", "No text detected in image")
+                        processOCRResult("No text detected")
+                    }
+                    
+                    // Clean up bitmap
+                    bitmap.recycle()
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("OverlayService", "OCR failed: ${e.message}")
+                    e.printStackTrace()
+                    bitmap.recycle()
+                    performFallbackOCR()
+                }
+                
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error in real OCR: ${e.message}")
+            e.printStackTrace()
+            bitmap.recycle()
+            performFallbackOCR()
+        }
+    }
+    
+    private fun performFallbackOCR() {
+        android.util.Log.d("OverlayService", "Using fallback OCR method")
+        val fallbackText = "Fallback: Screen capture not available yet - requires MediaProjection permission"
+        android.util.Log.d("OverlayService", "Fallback OCR Result: $fallbackText")
+        processOCRResult(fallbackText)
+    }
+    
+    private fun processOCRResult(text: String) {
+        try {
+            android.util.Log.d("OverlayService", "Processing OCR result: $text")
+            
+            // Add your custom logic here to process the extracted text
+            // For example, search for specific keywords, extract phone numbers, etc.
+            
+            // Log the final processed result
+            android.util.Log.d("OverlayService", "Final processed OCR result: $text")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error processing OCR result: ${e.message}")
+            e.printStackTrace()
+        }
         
-        // You can add your custom logic here
-        // For example, open a specific activity or perform an action
     }
     
     override fun onDestroy() {
@@ -264,5 +403,9 @@ class OverlayService : Service() {
             hideOverlay()
         }
         handler.removeCallbacksAndMessages(null)
+        
+        // Clean up OCR resources
+        textRecognizer.close()
+        executor.shutdown()
     }
 } 
