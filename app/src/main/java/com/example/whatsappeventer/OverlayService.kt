@@ -84,27 +84,49 @@ class OverlayService : Service() {
     }
     
     private fun startWhatsAppMonitoring() {
-        handler.postDelayed(object : Runnable {
+        // Start continuous monitoring loop
+        handler.post(object : Runnable {
             override fun run() {
-                if (isWhatsAppInForeground()) {
-                    if (!isOverlayVisible) {
-                        showOverlay()
+                try {
+                    // Check if WhatsApp is in foreground
+                    val isWhatsAppActive = isWhatsAppInForeground()
+                    
+                    if (isWhatsAppActive) {
+                        if (!isOverlayVisible) {
+                            android.util.Log.d("OverlayService", "WhatsApp detected - showing overlay")
+                            showOverlay()
+                        } else {
+                            android.util.Log.d("OverlayService", "WhatsApp still active - overlay already visible")
+                        }
+                    } else {
+                        if (isOverlayVisible) {
+                            android.util.Log.d("OverlayService", "WhatsApp not active - hiding overlay")
+                            hideOverlay()
+                        } else {
+                            android.util.Log.d("OverlayService", "WhatsApp not active - overlay already hidden")
+                        }
                     }
-                } else {
-                    if (isOverlayVisible) {
-                        hideOverlay()
-                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("OverlayService", "Error in monitoring loop: ${e.message}")
+                    e.printStackTrace()
                 }
+                
+                // Continue monitoring - this creates an infinite loop
+                // that only stops when the service is destroyed
                 handler.postDelayed(this, CHECK_INTERVAL)
             }
-        }, CHECK_INTERVAL)
+        })
+        
+        // Log that monitoring has started
+        android.util.Log.d("OverlayService", "WhatsApp monitoring started - checking every ${CHECK_INTERVAL}ms")
     }
     
     private fun isWhatsAppInForeground(): Boolean {
-        val endTime = System.currentTimeMillis()
-        val beginTime = endTime - 1000 // Check last second
-        
         try {
+            val endTime = System.currentTimeMillis()
+            val beginTime = endTime - 3000 // Check last 3 seconds for better reliability
+            
+            // Use queryUsageStats with a longer time window for better reliability
             val usageStats = usageStatsManager.queryUsageStats(
                 android.app.usage.UsageStatsManager.INTERVAL_DAILY,
                 beginTime,
@@ -122,8 +144,12 @@ class OverlayService : Service() {
                 }
             }
             
-            return lastUsedApp == WHATSAPP_PACKAGE
+            val isWhatsApp = lastUsedApp == WHATSAPP_PACKAGE
+            android.util.Log.d("OverlayService", "Detection result - app: $lastUsedApp, isWhatsApp: $isWhatsApp, timeWindow: ${endTime - beginTime}ms")
+            return isWhatsApp
+            
         } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error detecting WhatsApp: ${e.message}")
             e.printStackTrace()
             return false
         }
