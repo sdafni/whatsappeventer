@@ -7,7 +7,9 @@ data class TestResult(
     val actualEvents: List<DetectedEvent>,
     val passed: Boolean,
     val score: Float,
-    val details: String
+    val details: String,
+    val calendarValidation: CalendarValidationResult? = null,
+    val calendarReadiness: Float = 0.0f
 )
 
 data class TestSummary(
@@ -15,7 +17,9 @@ data class TestSummary(
     val passedTests: Int,
     val failedTests: Int,
     val averageScore: Float,
-    val scoresByDifficulty: Map<TestDifficulty, DifficultyScore>
+    val scoresByDifficulty: Map<TestDifficulty, DifficultyScore>,
+    val calendarReadyTests: Int = 0,
+    val averageCalendarReadiness: Float = 0.0f
 )
 
 data class DifficultyScore(
@@ -30,7 +34,10 @@ class EventDetectionTestRunner(
 ) {
     companion object {
         private const val TAG = "EventDetectionTest"
+        private const val CALENDAR_READINESS_THRESHOLD = 0.8f
     }
+    
+    private val calendarValidator = CalendarJsonValidator()
     
     fun runAllTests(): TestSummary {
         Log.i(TAG, "Starting comprehensive event detection test suite with ${detector.getDetectorName()}")
@@ -68,7 +75,11 @@ class EventDetectionTestRunner(
             // Evaluate results
             val (passed, score, details) = evaluateResults(testCase, actualEvents)
             
+            // Evaluate calendar readiness
+            val (calendarValidation, calendarReadiness) = evaluateCalendarReadiness(actualEvents)
+            
             Log.d(TAG, "Test ${testCase.name}: ${if (passed) "PASSED" else "FAILED"} (score: $score)")
+            Log.d(TAG, "Calendar readiness: ${"%.2f".format(calendarReadiness)}")
             Log.d(TAG, "Details: $details")
             
             return TestResult(
@@ -76,7 +87,9 @@ class EventDetectionTestRunner(
                 actualEvents = actualEvents,
                 passed = passed,
                 score = score,
-                details = details
+                details = details,
+                calendarValidation = calendarValidation,
+                calendarReadiness = calendarReadiness
             )
             
         } catch (e: Exception) {
@@ -86,7 +99,9 @@ class EventDetectionTestRunner(
                 actualEvents = emptyList(),
                 passed = false,
                 score = 0.0f,
-                details = "Exception during detection: ${e.message}"
+                details = "Exception during detection: ${e.message}",
+                calendarValidation = null,
+                calendarReadiness = 0.0f
             )
         }
     }
@@ -189,11 +204,52 @@ class EventDetectionTestRunner(
         return score
     }
     
+    /**
+     * Evaluates calendar readiness by converting detected events to JSON and validating
+     */
+    private fun evaluateCalendarReadiness(events: List<DetectedEvent>): Pair<CalendarValidationResult?, Float> {
+        if (events.isEmpty()) {
+            return Pair(null, 1.0f) // Empty is calendar-ready (no events to create)
+        }
+        
+        return try {
+            // Convert to calendar JSON
+            val calendarJson = EventToCalendarMapper.convertEventsToCalendarJson(events)
+            
+            // Validate the JSON
+            val validation = calendarValidator.validateCalendarJson(calendarJson)
+            
+            // Calculate readiness score
+            val readinessScore = if (validation.isValid) {
+                validation.score
+            } else {
+                // Penalize invalid JSON more heavily
+                validation.score * 0.5f
+            }
+            
+            Log.d(TAG, "Calendar validation: valid=${validation.isValid}, score=${validation.score}")
+            if (validation.errors.isNotEmpty()) {
+                Log.d(TAG, "Calendar validation errors: ${validation.errors}")
+            }
+            
+            Pair(validation, readinessScore)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Calendar readiness evaluation failed: ${e.message}")
+            Pair(null, 0.0f)
+        }
+    }
+    
     private fun generateSummary(results: List<TestResult>): TestSummary {
         val totalTests = results.size
         val passedTests = results.count { it.passed }
         val failedTests = totalTests - passedTests
         val averageScore = if (results.isEmpty()) 0.0f else results.map { it.score }.average().toFloat()
+        
+        // Calculate calendar readiness metrics
+        val calendarReadyTests = results.count { it.calendarReadiness >= CALENDAR_READINESS_THRESHOLD }
+        val averageCalendarReadiness = if (results.isEmpty()) 0.0f else 
+            results.map { it.calendarReadiness }.average().toFloat()
         
         val scoresByDifficulty = results.groupBy { it.testCase.difficulty }
             .mapValues { (difficulty, testResults) ->
@@ -210,7 +266,9 @@ class EventDetectionTestRunner(
             passedTests = passedTests,
             failedTests = failedTests,
             averageScore = averageScore,
-            scoresByDifficulty = scoresByDifficulty
+            scoresByDifficulty = scoresByDifficulty,
+            calendarReadyTests = calendarReadyTests,
+            averageCalendarReadiness = averageCalendarReadiness
         )
     }
     
@@ -224,6 +282,12 @@ class EventDetectionTestRunner(
         Log.i(TAG, "  Failed: ${results.failedTests}")
         Log.i(TAG, "  Success Rate: ${((results.passedTests.toFloat() / results.totalTests) * 100).toInt()}%")
         Log.i(TAG, "  Average Score: ${"%.2f".format(results.averageScore)}")
+        Log.i(TAG, "")
+        
+        Log.i(TAG, "CALENDAR READINESS:")
+        Log.i(TAG, "  Calendar-Ready Tests: ${results.calendarReadyTests}/${results.totalTests}")
+        Log.i(TAG, "  Calendar Readiness Rate: ${((results.calendarReadyTests.toFloat() / results.totalTests) * 100).toInt()}%")
+        Log.i(TAG, "  Average Calendar Score: ${"%.2f".format(results.averageCalendarReadiness)}")
         Log.i(TAG, "")
         
         Log.i(TAG, "PERFORMANCE BY DIFFICULTY:")

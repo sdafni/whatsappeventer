@@ -1,90 +1,111 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="WhatsApp Eventer"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="32dp" />
-
-    <Button
-        android:id="@+id/btnStartStop"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Start Overlay"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btnOverlayPermission"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Grant Overlay Permission"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btnUsageStatsPermission"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Grant Usage Stats Permission"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btnAccessibilityPermission"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Grant Accessibility Permission"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Status: Ready"
-        android:layout_marginTop="32dp" />
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="32dp"
-        android:gravity="center">
+        android:padding="12dp"
+        android:gravity="center_horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WhatsApp Eventer"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/btnStartStop"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
+            android:text="Start Overlay"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnOverlayPermission"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
+            android:text="Grant Overlay Permission"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnUsageStatsPermission"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
+            android:text="Grant Usage Stats Permission"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnAccessibilityPermission"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
+            android:text="Grant Accessibility Permission"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Status: Ready"
+            android:textSize="14sp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginVertical="8dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Event Detection Testing"
-            android:textSize="18sp"
+            android:textSize="16sp"
             android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="12dp" />
 
         <Button
             android:id="@+id/btnRunQuickTest"
-            android:layout_width="200dp"
-            android:layout_height="wrap_content"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
             android:text="Run Quick Test"
-            android:layout_marginBottom="8dp" />
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp" />
 
         <Button
             android:id="@+id/btnRunFullTest"
-            android:layout_width="200dp"
-            android:layout_height="wrap_content"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
             android:text="Run Full Test Suite"
-            android:layout_marginBottom="8dp" />
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btnRunCalendarTest"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
+            android:text="Calendar Integration Test"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp" />
 
         <Button
             android:id="@+id/btnShowTestCases"
-            android:layout_width="200dp"
-            android:layout_height="wrap_content"
+            android:layout_width="180dp"
+            android:layout_height="44dp"
             android:text="Show Test Cases"
-            android:layout_marginBottom="8dp" />
+            android:textSize="13sp"
+            android:layout_marginBottom="16dp" />
 
     </LinearLayout>
 
-</LinearLayout> 
+</ScrollView> 

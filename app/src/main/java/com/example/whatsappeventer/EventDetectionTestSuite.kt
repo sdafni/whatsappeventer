@@ -291,6 +291,139 @@ class EventDetectionTestSuite {
                     ),
                     difficulty = TestDifficulty.MEDIUM,
                     description = "Time reference without specific activity"
+                ),
+                
+                // ===== CALENDAR INTEGRATION EDGE CASES =====
+                EventTestCase(
+                    name = "invalid_time_format",
+                    conversation = "meeting at 25:99", // Invalid time
+                    expectedEvents = listOf(), // Should not detect invalid times
+                    difficulty = TestDifficulty.HARD,
+                    description = "Invalid time format should not create events"
+                ),
+                
+                EventTestCase(
+                    name = "ambiguous_date_reference",
+                    conversation = "let's meet on the 32nd", // Invalid date
+                    expectedEvents = listOf(), // Should not detect invalid dates
+                    difficulty = TestDifficulty.HARD,
+                    description = "Invalid date should not create events"
+                ),
+                
+                EventTestCase(
+                    name = "very_long_title_test",
+                    conversation = "let's have a meeting about the extremely important project that involves multiple stakeholders and requires careful coordination across various departments and teams at 3pm tomorrow",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Meeting", hasDateTime = true, minConfidence = 0.6f)
+                    ),
+                    difficulty = TestDifficulty.MEDIUM,
+                    description = "Very long conversation should produce manageable event title"
+                ),
+                
+                EventTestCase(
+                    name = "unicode_and_special_chars",
+                    conversation = "café meeting at 2pm with André & José 📅",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Meeting", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.MEDIUM,
+                    description = "Unicode characters and emojis should be handled properly"
+                ),
+                
+                EventTestCase(
+                    name = "timezone_edge_case",
+                    conversation = "call at 3pm PST tomorrow",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Call", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.HARD,
+                    description = "Explicit timezone mentions"
+                ),
+                
+                EventTestCase(
+                    name = "midnight_edge_case",
+                    conversation = "meeting at midnight tonight",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Meeting", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.MEDIUM,
+                    description = "Midnight time reference"
+                ),
+                
+                EventTestCase(
+                    name = "noon_edge_case",
+                    conversation = "lunch at noon tomorrow",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Meal", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.MEDIUM,
+                    description = "Noon time reference"
+                ),
+                
+                EventTestCase(
+                    name = "duration_mentions",
+                    conversation = "2-hour meeting at 10am tomorrow",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Meeting", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.HARD,
+                    description = "Explicit duration mentions should be preserved"
+                ),
+                
+                EventTestCase(
+                    name = "recurring_hint",
+                    conversation = "weekly team meeting every Tuesday at 10am",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Meeting", hasDateTime = true, minConfidence = 0.6f)
+                    ),
+                    difficulty = TestDifficulty.HARD,
+                    description = "Recurring event hints"
+                ),
+                
+                EventTestCase(
+                    name = "location_with_address",
+                    conversation = "meet at Starbucks, 123 Main St at 3pm",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Event", hasDateTime = true, hasLocation = true, minConfidence = 0.6f)
+                    ),
+                    difficulty = TestDifficulty.MEDIUM,
+                    description = "Specific location with address"
+                ),
+                
+                EventTestCase(
+                    name = "multiple_times_same_message",
+                    conversation = "available between 2pm and 4pm, prefer 3pm",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Event", hasDateTime = true, minConfidence = 0.5f)
+                    ),
+                    difficulty = TestDifficulty.HARD,
+                    description = "Multiple time references in same message"
+                ),
+                
+                EventTestCase(
+                    name = "empty_string_test",
+                    conversation = "",
+                    expectedEvents = listOf(),
+                    difficulty = TestDifficulty.EASY,
+                    description = "Empty conversation should produce no events"
+                ),
+                
+                EventTestCase(
+                    name = "whitespace_only_test",
+                    conversation = "   \n   \t   ",
+                    expectedEvents = listOf(),
+                    difficulty = TestDifficulty.EASY,
+                    description = "Whitespace-only conversation should produce no events"
+                ),
+                
+                EventTestCase(
+                    name = "very_short_message",
+                    conversation = "3pm",
+                    expectedEvents = listOf(
+                        ExpectedEvent("Event", hasDateTime = true, minConfidence = 0.4f)
+                    ),
+                    difficulty = TestDifficulty.MEDIUM,
+                    description = "Very short time-only message"
                 )
             )
         }

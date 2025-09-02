@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     // Test buttons
     private lateinit var btnRunQuickTest: Button
     private lateinit var btnRunFullTest: Button
+    private lateinit var btnRunCalendarTest: Button
     private lateinit var btnShowTestCases: Button
     
     private var isOverlayRunning = false
@@ -53,6 +54,7 @@ class MainActivity : AppCompatActivity() {
         // Test buttons
         btnRunQuickTest = findViewById(R.id.btnRunQuickTest)
         btnRunFullTest = findViewById(R.id.btnRunFullTest)
+        btnRunCalendarTest = findViewById(R.id.btnRunCalendarTest)
         btnShowTestCases = findViewById(R.id.btnShowTestCases)
     }
     
@@ -84,6 +86,10 @@ class MainActivity : AppCompatActivity() {
         
         btnRunFullTest.setOnClickListener {
             runFullTest()
+        }
+        
+        btnRunCalendarTest.setOnClickListener {
+            runCalendarIntegrationTest()
         }
         
         btnShowTestCases.setOnClickListener {
@@ -276,6 +282,13 @@ class MainActivity : AppCompatActivity() {
         
         val tester = EventDetectionTester(this)
         tester.runFullTestSuite()
+    }
+    
+    private fun runCalendarIntegrationTest() {
+        android.util.Log.i("MainActivity", "Running calendar integration tests...")
+        
+        val tester = EventDetectionTester(this)
+        tester.runCalendarIntegrationTest()
     }
     
     private fun showTestCases() {

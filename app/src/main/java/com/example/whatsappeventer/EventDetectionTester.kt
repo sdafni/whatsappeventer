@@ -110,6 +110,33 @@ class EventDetectionTester(private val context: Context) {
         }
     }
     
+    fun runCalendarIntegrationTest() {
+        Log.i(TAG, "Running calendar integration tests...")
+        
+        Thread {
+            try {
+                val detector = NlpEventDetector()
+                val calendarTestRunner = CalendarIntegrationTestRunner(detector)
+                
+                // Run calendar integration tests
+                val results = calendarTestRunner.runCalendarIntegrationTests()
+                calendarTestRunner.printCalendarIntegrationResults(results)
+                
+                val readinessRate = ((results.calendarReadyCount.toFloat() / results.totalTests) * 100).toInt()
+                val message = "Calendar Integration: $readinessRate% ready (${results.calendarReadyCount}/${results.totalTests})"
+                
+                // Show result on main thread
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error running calendar integration tests: ${e.message}")
+                e.printStackTrace()
+            }
+        }.start()
+    }
+    
     fun showTestCaseList() {
         Log.i(TAG, "=== AVAILABLE TEST CASES ===")
         
