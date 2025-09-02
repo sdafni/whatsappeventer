@@ -35,6 +35,13 @@
         android:text="Grant Usage Stats Permission"
         android:layout_marginBottom="16dp" />
 
+    <Button
+        android:id="@+id/btnAccessibilityPermission"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="Grant Accessibility Permission"
+        android:layout_marginBottom="16dp" />
+
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"

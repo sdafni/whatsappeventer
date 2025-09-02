@@ -7,4 +7,5 @@
     <string name="grant_usage_stats_permission">Grant Usage Stats Permission</string>
     <string name="overlay_service_running">Overlay Service Running</string>
     <string name="overlay_service_stopped">Overlay Service Stopped</string>
+    <string name="accessibility_service_description">Allows WhatsApp Eventer to read WhatsApp conversations for calendar event creation. This service only monitors WhatsApp messages and does not access other apps or personal data.</string>
 </resources> 

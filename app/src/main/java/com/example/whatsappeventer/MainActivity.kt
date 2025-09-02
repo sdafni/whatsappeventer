@@ -10,12 +10,15 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
+import android.content.ComponentName
+import android.text.TextUtils
 
 class MainActivity : AppCompatActivity() {
     
     private lateinit var btnStartStop: Button
     private lateinit var btnOverlayPermission: Button
     private lateinit var btnUsageStatsPermission: Button
+    private lateinit var btnAccessibilityPermission: Button
     private lateinit var tvStatus: TextView
     
     private var isOverlayRunning = false
@@ -23,7 +26,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val OVERLAY_PERMISSION_REQUEST_CODE = 1234
         private const val USAGE_STATS_PERMISSION_REQUEST_CODE = 5678
-        private const val STORAGE_PERMISSION_REQUEST_CODE = 9012
+        private const val ACCESSIBILITY_PERMISSION_REQUEST_CODE = 3456
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         btnStartStop = findViewById(R.id.btnStartStop)
         btnOverlayPermission = findViewById(R.id.btnOverlayPermission)
         btnUsageStatsPermission = findViewById(R.id.btnUsageStatsPermission)
+        btnAccessibilityPermission = findViewById(R.id.btnAccessibilityPermission)
         tvStatus = findViewById(R.id.tvStatus)
     }
     
@@ -59,9 +63,8 @@ class MainActivity : AppCompatActivity() {
             requestUsageStatsPermission()
         }
         
-        // Add storage permission button if needed
-        if (!hasStoragePermissions()) {
-            requestStoragePermissions()
+        btnAccessibilityPermission.setOnClickListener {
+            requestAccessibilityPermission()
         }
     }
     
@@ -76,8 +79,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        if (!hasStoragePermissions()) {
-            tvStatus.text = "Status: Storage permission required"
+        if (!hasAccessibilityPermission()) {
+            tvStatus.text = "Status: Accessibility permission required"
             return
         }
         
@@ -119,6 +122,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
+    private fun requestAccessibilityPermission() {
+        if (!hasAccessibilityPermission()) {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivityForResult(intent, ACCESSIBILITY_PERMISSION_REQUEST_CODE)
+        }
+    }
+    
     private fun hasUsageStatsPermission(): Boolean {
         val appOps = getSystemService(APP_OPS_SERVICE) as android.app.AppOpsManager
         val mode = appOps.checkOpNoThrow(
@@ -129,36 +139,32 @@ class MainActivity : AppCompatActivity() {
         return mode == android.app.AppOpsManager.MODE_ALLOWED
     }
     
-    private fun hasStoragePermissions(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            android.os.Environment.isExternalStorageManager()
-        } else {
-            checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-            checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    private fun hasAccessibilityPermission(): Boolean {
+        val accessibilityEnabled = Settings.Secure.getInt(
+            contentResolver,
+            Settings.Secure.ACCESSIBILITY_ENABLED, 0
+        ) == 1
+        
+        if (accessibilityEnabled) {
+            val enabledServices = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+            
+            val colonSplitter = TextUtils.SimpleStringSplitter(':')
+            colonSplitter.setString(enabledServices)
+            
+            while (colonSplitter.hasNext()) {
+                val componentName = ComponentName.unflattenFromString(colonSplitter.next())
+                if (componentName != null && componentName.packageName == packageName) {
+                    return true
+                }
+            }
         }
+        
+        return false
     }
     
-    private fun requestStoragePermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.addCategory("android.intent.category.DEFAULT")
-                intent.data = Uri.parse("package:$packageName")
-                startActivityForResult(intent, STORAGE_PERMISSION_REQUEST_CODE)
-            } catch (e: Exception) {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivityForResult(intent, STORAGE_PERMISSION_REQUEST_CODE)
-            }
-        } else {
-            requestPermissions(
-                arrayOf(
-                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ),
-                STORAGE_PERMISSION_REQUEST_CODE
-            )
-        }
-    }
     
     private fun isOverlayServiceRunning(): Boolean {
         try {
@@ -206,8 +212,9 @@ class MainActivity : AppCompatActivity() {
             btnUsageStatsPermission.isEnabled = false
         }
         
-        if (hasStoragePermissions()) {
-            // Storage permission granted - no button needed
+        if (hasAccessibilityPermission()) {
+            btnAccessibilityPermission.text = "Accessibility Permission: Granted"
+            btnAccessibilityPermission.isEnabled = false
         }
     }
     
@@ -221,7 +228,7 @@ class MainActivity : AppCompatActivity() {
             USAGE_STATS_PERMISSION_REQUEST_CODE -> {
                 checkPermissions()
             }
-            STORAGE_PERMISSION_REQUEST_CODE -> {
+            ACCESSIBILITY_PERMISSION_REQUEST_CODE -> {
                 checkPermissions()
             }
         }
