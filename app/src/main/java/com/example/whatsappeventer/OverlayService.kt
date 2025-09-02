@@ -3,6 +3,7 @@ package com.example.whatsappeventer
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -51,6 +52,8 @@ class OverlayService : Service() {
     private var imageReader: ImageReader? = null
     private lateinit var textRecognizer: com.google.mlkit.vision.text.TextRecognizer
     private lateinit var executor: ExecutorService
+    private lateinit var mediaProjectionManager: MediaProjectionManager
+    private var screenDensity = 0
     
     companion object {
         private const val NOTIFICATION_ID = 1001
@@ -66,18 +69,46 @@ class OverlayService : Service() {
         usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         handler = Handler(Looper.getMainLooper())
         
+        // Initialize screen capture components
+        mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        screenDensity = resources.displayMetrics.densityDpi
+        
         // Initialize OCR components
         textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         executor = Executors.newSingleThreadExecutor()
         
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
         
         // Start monitoring WhatsApp usage
         startWhatsAppMonitoring()
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        intent?.let {
+            when (it.action) {
+                "SCREEN_CAPTURE_PERMISSION_GRANTED" -> {
+                    val resultCode = it.getIntExtra("resultCode", -1)
+                    val data = it.getParcelableExtra<Intent>("data")
+                    if (data != null) {
+                        android.util.Log.d("OverlayService", "Screen capture permission granted, setting up MediaProjection")
+                        setupMediaProjection(resultCode, data)
+                    } else {
+                        android.util.Log.e("OverlayService", "Permission granted but no data received")
+                    }
+                }
+                "SCREEN_CAPTURE_PERMISSION_DENIED" -> {
+                    android.util.Log.d("OverlayService", "Screen capture permission denied")
+                }
+                else -> {
+                    android.util.Log.d("OverlayService", "Unknown intent action: ${it.action}")
+                }
+            }
+        }
         return START_STICKY
     }
     
@@ -260,26 +291,66 @@ class OverlayService : Service() {
     
     private fun onOverlayButtonClick() {
         android.util.Log.d("OverlayService", "Overlay button clicked - starting screen capture and OCR")
-        captureScreenAndPerformOCR()
+        if (mediaProjection == null) {
+            android.util.Log.d("OverlayService", "MediaProjection not available, requesting permission")
+            requestScreenCapturePermission()
+        } else {
+            android.util.Log.d("OverlayService", "MediaProjection available, capturing screen")
+            captureScreenAndPerformOCR()
+        }
+    }
+    
+    private fun requestScreenCapturePermission() {
+        android.util.Log.d("OverlayService", "Requesting screen capture permission")
+        val intent = Intent(this, ScreenCaptureActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(intent)
+    }
+    
+    private fun setupMediaProjection(resultCode: Int, data: Intent) {
+        try {
+            android.util.Log.d("OverlayService", "Setting up MediaProjection")
+            mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data)
+            
+            // Register callback before starting capture
+            mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+                override fun onStop() {
+                    android.util.Log.d("OverlayService", "MediaProjection stopped")
+                    cleanupScreenCapture()
+                    mediaProjection = null
+                }
+            }, null)
+            
+            android.util.Log.d("OverlayService", "MediaProjection setup complete, now capturing screen")
+            captureScreenAndPerformOCR()
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error setting up MediaProjection: ${e.message}")
+            e.printStackTrace()
+        }
     }
     
     private fun captureScreenAndPerformOCR() {
         try {
             android.util.Log.d("OverlayService", "Starting real screen capture and OCR process")
             
-            // For now, we'll capture the current screen using a different approach
-            // Since we don't have MediaProjection permission yet, we'll use a workaround
-            captureCurrentScreenAndPerformOCR()
+            if (mediaProjection != null) {
+                captureScreenWithMediaProjection()
+            } else {
+                android.util.Log.d("OverlayService", "MediaProjection not available, using fallback")
+                performFallbackOCR()
+            }
             
         } catch (e: Exception) {
             android.util.Log.e("OverlayService", "Error in screen capture: ${e.message}")
             e.printStackTrace()
+            performFallbackOCR()
         }
     }
     
-    private fun captureCurrentScreenAndPerformOCR() {
+    private fun captureScreenWithMediaProjection() {
         try {
-            android.util.Log.d("OverlayService", "Capturing current screen for OCR")
+            android.util.Log.d("OverlayService", "Capturing screen with MediaProjection")
             
             // Get the current display metrics
             val displayMetrics = resources.displayMetrics
@@ -288,38 +359,92 @@ class OverlayService : Service() {
             
             android.util.Log.d("OverlayService", "Screen dimensions: ${screenWidth}x${screenHeight}")
             
-            // Create a bitmap of the current screen (this is a simplified approach)
-            // In a real implementation, you'd use MediaProjection API
-            val bitmap = createScreenBitmap(screenWidth, screenHeight)
+            // Setup ImageReader
+            imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 1)
             
-            if (bitmap != null) {
-                android.util.Log.d("OverlayService", "Screen bitmap created, performing OCR")
-                performRealOCR(bitmap)
-            } else {
-                android.util.Log.e("OverlayService", "Failed to create screen bitmap")
-                // Fallback to simulated OCR for now
-                performFallbackOCR()
-            }
+            // Setup VirtualDisplay
+            virtualDisplay = mediaProjection?.createVirtualDisplay(
+                "ScreenCapture",
+                screenWidth, screenHeight, screenDensity,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader?.surface, null, null
+            )
+            
+            // Set up image available listener
+            imageReader?.setOnImageAvailableListener({
+                try {
+                    val image = imageReader?.acquireLatestImage()
+                    if (image != null) {
+                        android.util.Log.d("OverlayService", "Image captured, converting to bitmap")
+                        val bitmap = imageTobitmap(image)
+                        image.close()
+                        
+                        if (bitmap != null) {
+                            performRealOCR(bitmap)
+                        } else {
+                            android.util.Log.e("OverlayService", "Failed to convert image to bitmap")
+                            performFallbackOCR()
+                        }
+                        
+                        // Clean up after capture
+                        cleanupScreenCapture()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("OverlayService", "Error processing captured image: ${e.message}")
+                    e.printStackTrace()
+                    performFallbackOCR()
+                }
+            }, null)
             
         } catch (e: Exception) {
-            android.util.Log.e("OverlayService", "Error capturing screen: ${e.message}")
+            android.util.Log.e("OverlayService", "Error setting up screen capture: ${e.message}")
             e.printStackTrace()
             performFallbackOCR()
         }
     }
     
-    private fun createScreenBitmap(width: Int, height: Int): Bitmap? {
-        return try {
-            // This is a simplified approach - in reality you'd need MediaProjection
-            // For now, we'll create a test bitmap to demonstrate the OCR flow
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            android.util.Log.d("OverlayService", "Created test bitmap: ${bitmap.width}x${bitmap.height}")
-            bitmap
+    private fun imageTobitmap(image: android.media.Image): Bitmap? {
+        try {
+            val planes = image.planes
+            val buffer = planes[0].buffer
+            val pixelStride = planes[0].pixelStride
+            val rowStride = planes[0].rowStride
+            val rowPadding = rowStride - pixelStride * image.width
+            
+            val bitmap = Bitmap.createBitmap(
+                image.width + rowPadding / pixelStride,
+                image.height,
+                Bitmap.Config.ARGB_8888
+            )
+            bitmap.copyPixelsFromBuffer(buffer)
+            
+            // Crop to actual screen size if there's padding
+            return if (rowPadding == 0) {
+                bitmap
+            } else {
+                val croppedBitmap = Bitmap.createBitmap(bitmap, 0, 0, image.width, image.height)
+                bitmap.recycle()
+                croppedBitmap
+            }
         } catch (e: Exception) {
-            android.util.Log.e("OverlayService", "Error creating bitmap: ${e.message}")
-            null
+            android.util.Log.e("OverlayService", "Error converting image to bitmap: ${e.message}")
+            e.printStackTrace()
+            return null
         }
     }
+    
+    private fun cleanupScreenCapture() {
+        try {
+            virtualDisplay?.release()
+            imageReader?.close()
+            virtualDisplay = null
+            imageReader = null
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error cleaning up screen capture: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
     
     private fun performRealOCR(bitmap: Bitmap) {
         try {
@@ -390,6 +515,11 @@ class OverlayService : Service() {
             hideOverlay()
         }
         handler.removeCallbacksAndMessages(null)
+        
+        // Clean up screen capture resources
+        cleanupScreenCapture()
+        mediaProjection?.stop()
+        mediaProjection = null
         
         // Clean up OCR resources
         textRecognizer.close()
