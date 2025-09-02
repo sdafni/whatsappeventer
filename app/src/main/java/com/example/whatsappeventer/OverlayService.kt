@@ -20,6 +20,9 @@ import androidx.core.app.NotificationCompat
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
 import android.util.Log
+import androidx.appcompat.app.AlertDialog
+import android.widget.TextView
+import android.widget.Button
 import java.util.*
 
 class OverlayService : Service() {
@@ -256,7 +259,7 @@ class OverlayService : Service() {
             
             if (conversationText.isNullOrEmpty()) {
                 android.util.Log.w("OverlayService", "No conversation text available from AccessibilityService")
-                Toast.makeText(this, "No conversation text found. Make sure accessibility service is enabled.", Toast.LENGTH_SHORT).show()
+                showEventsModal("No conversation text found. Make sure accessibility service is enabled.", emptyList())
                 return
             }
             
@@ -266,28 +269,95 @@ class OverlayService : Service() {
             val eventDetector = EventDetector()
             val detectedEvents = eventDetector.detectEvents(conversationText)
             
-            if (detectedEvents.isEmpty()) {
-                Toast.makeText(this, "No calendar events detected in conversation", Toast.LENGTH_SHORT).show()
-                android.util.Log.d("OverlayService", "No events detected")
-            } else {
-                val eventSummary = detectedEvents.joinToString("\n") { event ->
-                    val dateStr = event.dateTime?.let { 
-                        val sdf = java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
-                        sdf.format(it.time)
-                    } ?: "Date TBD"
-                    "• ${event.title} - $dateStr"
-                }
-                
-                android.util.Log.d("OverlayService", "Detected events:\n$eventSummary")
-                Toast.makeText(this, "Found ${detectedEvents.size} events:\n$eventSummary", Toast.LENGTH_LONG).show()
-                
-                // TODO: Show events in a proper UI and allow user to add to calendar
-            }
+            android.util.Log.d("OverlayService", "Detected ${detectedEvents.size} events")
+            showEventsModal(conversationText, detectedEvents)
             
         } catch (e: Exception) {
             android.util.Log.e("OverlayService", "Error extracting events from conversation: ${e.message}")
             e.printStackTrace()
-            Toast.makeText(this, "Error extracting events: ${e.message}", Toast.LENGTH_SHORT).show()
+            showEventsModal("Error extracting events: ${e.message}", emptyList())
+        }
+    }
+    
+    private var modalWindow: View? = null
+    
+    private fun showEventsModal(conversationText: String, events: List<DetectedEvent>) {
+        android.util.Log.d("OverlayService", "=== SHOWING EVENTS MODAL ===")
+        android.util.Log.d("OverlayService", "Events count: ${events.size}")
+        android.util.Log.d("OverlayService", "Conversation text length: ${conversationText.length}")
+        
+        try {
+            // Hide any existing modal first
+            hideEventsModal()
+            
+            android.util.Log.d("OverlayService", "Step 1: Inflating dialog layout...")
+            // Create dialog with custom layout
+            val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_calendar_events, null)
+            android.util.Log.d("OverlayService", "Step 1: Layout inflated successfully")
+            
+            android.util.Log.d("OverlayService", "Step 2: Finding views...")
+            val tvEventsJson = dialogView.findViewById<TextView>(R.id.tvEventsJson)
+            val btnOk = dialogView.findViewById<Button>(R.id.btnOk)
+            android.util.Log.d("OverlayService", "Step 2: Views found - TextView: $tvEventsJson, Button: $btnOk")
+            
+            android.util.Log.d("OverlayService", "Step 3: Generating calendar JSON...")
+            // Generate calendar JSON
+            val calendarJson = EventToCalendarMapper.convertEventsToCalendarJson(events)
+            android.util.Log.d("OverlayService", "Step 3: Calendar JSON generated, length: ${calendarJson.length}")
+            android.util.Log.d("OverlayService", "JSON Preview: ${calendarJson.take(200)}...")
+            
+            tvEventsJson.text = calendarJson
+            android.util.Log.d("OverlayService", "Step 4: JSON text set to TextView")
+            
+            // Set up OK button
+            btnOk.setOnClickListener {
+                android.util.Log.d("OverlayService", "OK button clicked - dismissing modal")
+                hideEventsModal()
+            }
+            android.util.Log.d("OverlayService", "Step 5: OK button listener set")
+            
+            android.util.Log.d("OverlayService", "Step 6: Creating window layout params...")
+            // Create window layout params for overlay dialog
+            val dialogParams = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    WindowManager.LayoutParams.TYPE_PHONE
+                },
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+            android.util.Log.d("OverlayService", "Step 6: Window layout params created")
+            
+            android.util.Log.d("OverlayService", "Step 7: Adding modal to window manager...")
+            windowManager.addView(dialogView, dialogParams)
+            modalWindow = dialogView
+            android.util.Log.d("OverlayService", "✅ SUCCESS: Events modal displayed with ${events.size} events")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "❌ ERROR showing events modal: ${e.message}")
+            android.util.Log.e("OverlayService", "❌ ERROR stack trace:", e)
+            e.printStackTrace()
+            // Fallback to toast if dialog fails
+            Toast.makeText(this, "Modal error: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+    
+    private fun hideEventsModal() {
+        modalWindow?.let { modal ->
+            try {
+                android.util.Log.d("OverlayService", "Hiding events modal...")
+                windowManager.removeView(modal)
+                modalWindow = null
+                android.util.Log.d("OverlayService", "Events modal hidden successfully")
+            } catch (e: Exception) {
+                android.util.Log.e("OverlayService", "Error hiding modal: ${e.message}")
+                modalWindow = null
+            }
         }
     }
     
@@ -297,6 +367,7 @@ class OverlayService : Service() {
         if (isOverlayVisible) {
             hideOverlay()
         }
+        hideEventsModal()
         handler.removeCallbacksAndMessages(null)
     }
 } 
