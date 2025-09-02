@@ -227,18 +227,24 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         // Collect all text from the screen
         collectAllText(rootNode, allTexts)
         
-        Log.d(TAG, "Fallback: Found ${allTexts.size} text elements")
-        allTexts.forEachIndexed { index, text ->
-            Log.d(TAG, "Text[$index]: '$text'")
+        Log.d(TAG, "Fallback: Found ${allTexts.size} text elements - looking for LAST message only")
+        
+        // Look for the last likely message text (reverse order)
+        for (i in allTexts.indices.reversed()) {
+            val text = allTexts[i]
+            Log.d(TAG, "Checking text[$i]: '$text'")
             
             // Filter out obvious UI elements and keep potential messages
             if (isLikelyMessageText(text)) {
+                Log.d(TAG, "Found last message via fallback: '$text'")
                 messages.add(ChatMessage(
                     sender = "Unknown",
                     content = text,
                     timestamp = System.currentTimeMillis(),
                     isFromUser = false
                 ))
+                // Only take the first (most recent) message found
+                break
             }
         }
         
@@ -332,14 +338,20 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         val messages = mutableListOf<ChatMessage>()
         
         try {
-            // Process all child nodes (message bubbles)
-            for (i in 0 until messagesList.childCount) {
+            Log.d(TAG, "Extracting messages - looking for LAST message only")
+            // Process child nodes in reverse order to find the most recent message
+            // The last message is typically at the bottom of the list (highest index)
+            
+            for (i in (messagesList.childCount - 1) downTo 0) {
                 val messageNode = messagesList.getChild(i) ?: continue
                 
                 try {
                     val message = extractMessageFromNode(messageNode)
                     if (message != null) {
+                        Log.d(TAG, "Found last message: ${message.content}")
                         messages.add(message)
+                        // Only take the first (most recent) message found
+                        break
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error extracting message from node: ${e.message}")
@@ -352,6 +364,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             Log.e(TAG, "Error processing messages list: ${e.message}")
         }
         
+        Log.d(TAG, "Extracted ${messages.size} messages (should be 1 or 0)")
         return messages
     }
 
@@ -463,6 +476,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     }
 
     fun getCurrentConversationText(): String {
+        // Since we now only capture the last message, just return it
         return currentChatMessages.joinToString("\n") { message ->
             "${message.sender}: ${message.content}"
         }
