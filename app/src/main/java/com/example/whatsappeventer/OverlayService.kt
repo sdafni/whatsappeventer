@@ -250,22 +250,9 @@ class OverlayService : Service() {
         
         view.setOnTouchListener { v, event ->
             android.util.Log.d("OverlayService", "Touch event received: action=${event.action}, x=${event.x}, y=${event.y}")
-            
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    android.util.Log.d("OverlayService", "Touch DOWN - X: ${event.rawX}, Y: ${event.rawY}")
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    android.util.Log.d("OverlayService", "Touch UP - Every touch counts as click!")
-                    onOverlayButtonClick()
-                    true
-                }
-                else -> {
-                    android.util.Log.d("OverlayService", "Other touch action: ${event.action}")
-                    true
-                }
-            }
+            android.util.Log.d("OverlayService", "Any touch triggers click!")
+            onOverlayButtonClick()
+            true
         }
         
         android.util.Log.d("OverlayService", "Touch listener setup complete")
