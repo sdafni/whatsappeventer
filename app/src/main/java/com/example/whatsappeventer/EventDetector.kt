@@ -75,9 +75,10 @@ class EventDetector {
         val events = mutableListOf<DetectedEvent>()
         
         // Pattern: "at 3pm", "at 15:00", "3:30 PM", etc.
+        // Only match when preceded by "at" or followed by activity context
         val timePatterns = listOf(
-            Pattern.compile("(\\b(?:at\\s+)?(\\d{1,2}):?(\\d{0,2})\\s*([ap]m|AM|PM)\\b)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("(\\b(?:at\\s+)?(\\d{1,2}):?(\\d{2})\\b)")
+            Pattern.compile("\\bat\\s+(\\d{1,2}):?(\\d{0,2})\\s*([ap]m|AM|PM)\\b", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("\\b(\\d{1,2}):?(\\d{0,2})\\s*([ap]m|AM|PM)(?=\\s*(?:for|to|we|let|i|meeting|dinner|lunch|call|appointment|party|movie))", Pattern.CASE_INSENSITIVE)
         )
         
         for (pattern in timePatterns) {
@@ -89,16 +90,20 @@ class EventDetector {
                 if (dateTime != null) {
                     // Look for activity keywords around the time
                     val activity = extractActivityNearTime(line, matcher.start(), matcher.end())
-                    val title = if (activity.isNotEmpty()) "$activity" else "Event"
                     
-                    events.add(DetectedEvent(
-                        title = title,
-                        description = line.trim(),
-                        dateTime = dateTime,
-                        confidence = 0.8f
-                    ))
-                    
-                    Log.d(TAG, "Found time-based event: $title at ${formatDateTime(dateTime)}")
+                    // Only create event if we have activity context or explicit "at" usage
+                    if (activity.isNotEmpty() || timeStr.lowercase().startsWith("at")) {
+                        val title = if (activity.isNotEmpty()) "$activity" else "Event"
+                        
+                        events.add(DetectedEvent(
+                            title = title,
+                            description = line.trim(),
+                            dateTime = dateTime,
+                            confidence = 0.8f
+                        ))
+                        
+                        Log.d(TAG, "Found time-based event: $title at ${formatDateTime(dateTime)}")
+                    }
                 }
             }
         }
