@@ -59,16 +59,37 @@ class EventDetector {
     private fun analyzeLineForEvents(line: String): List<DetectedEvent> {
         val events = mutableListOf<DetectedEvent>()
         
-        // Pattern 1: Explicit time mentions with activities
-        events.addAll(detectTimeBasedEvents(line))
+        // Pattern 1: Explicit time mentions with activities (highest priority)
+        val timeBasedEvents = detectTimeBasedEvents(line)
+        events.addAll(timeBasedEvents)
         
-        // Pattern 2: Day-based events  
-        events.addAll(detectDayBasedEvents(line))
+        // Pattern 2: Day-based events (only if no time-based events found)
+        if (timeBasedEvents.isEmpty()) {
+            val dayBasedEvents = detectDayBasedEvents(line)
+            events.addAll(dayBasedEvents)
+            
+            // Pattern 3: Activity-based events (only if no time or day-based events found)
+            if (dayBasedEvents.isEmpty()) {
+                events.addAll(detectActivityBasedEvents(line))
+            }
+        }
         
-        // Pattern 3: Activity-based events
-        events.addAll(detectActivityBasedEvents(line))
-        
-        return events
+        // Remove duplicates based on title and description
+        return deduplicateEvents(events)
+    }
+    
+    private fun deduplicateEvents(events: List<DetectedEvent>): List<DetectedEvent> {
+        val seen = mutableSetOf<Pair<String, String>>()
+        return events.filter { event ->
+            val key = Pair(event.title.lowercase(), event.description.lowercase())
+            if (seen.contains(key)) {
+                Log.d(TAG, "Removing duplicate event: ${event.title}")
+                false
+            } else {
+                seen.add(key)
+                true
+            }
+        }
     }
 
     private fun detectTimeBasedEvents(line: String): List<DetectedEvent> {
