@@ -18,6 +18,8 @@ class EventDetector {
     companion object {
         private const val TAG = "EventDetector"
     }
+    
+    private val languageDetector = LanguageDetector()
 
     fun detectEvents(conversationText: String): List<DetectedEvent> {
         Log.d(TAG, "Analyzing conversation text for events: ${conversationText.length} characters")
@@ -59,6 +61,35 @@ class EventDetector {
     private fun analyzeLineForEvents(line: String): List<DetectedEvent> {
         val events = mutableListOf<DetectedEvent>()
         
+        // Detect language and route to appropriate detection methods
+        val language = languageDetector.detectLanguage(line)
+        Log.d(TAG, "Detected language: $language for line: $line")
+        
+        when (language) {
+            DetectedLanguage.HEBREW -> {
+                events.addAll(detectHebrewEvents(line))
+            }
+            DetectedLanguage.ENGLISH -> {
+                events.addAll(detectEnglishEvents(line))
+            }
+            DetectedLanguage.MIXED -> {
+                // Try both Hebrew and English patterns
+                events.addAll(detectHebrewEvents(line))
+                events.addAll(detectEnglishEvents(line))
+            }
+            DetectedLanguage.UNKNOWN -> {
+                // Default to English patterns for unknown language
+                events.addAll(detectEnglishEvents(line))
+            }
+        }
+        
+        // Remove duplicates based on title and description
+        return deduplicateEvents(events)
+    }
+    
+    private fun detectEnglishEvents(line: String): List<DetectedEvent> {
+        val events = mutableListOf<DetectedEvent>()
+        
         // Pattern 1: Explicit time mentions with activities (highest priority)
         val timeBasedEvents = detectTimeBasedEvents(line)
         events.addAll(timeBasedEvents)
@@ -74,8 +105,28 @@ class EventDetector {
             }
         }
         
-        // Remove duplicates based on title and description
-        return deduplicateEvents(events)
+        return events
+    }
+    
+    private fun detectHebrewEvents(line: String): List<DetectedEvent> {
+        val events = mutableListOf<DetectedEvent>()
+        
+        // Pattern 1: Hebrew time-based events (highest priority)
+        val hebrewTimeEvents = detectHebrewTimeBasedEvents(line)
+        events.addAll(hebrewTimeEvents)
+        
+        // Pattern 2: Hebrew day-based events (only if no time-based events found)
+        if (hebrewTimeEvents.isEmpty()) {
+            val hebrewDayEvents = detectHebrewDayBasedEvents(line)
+            events.addAll(hebrewDayEvents)
+            
+            // Pattern 3: Hebrew activity-based events (only if no time or day-based events found)
+            if (hebrewDayEvents.isEmpty()) {
+                events.addAll(detectHebrewActivityBasedEvents(line))
+            }
+        }
+        
+        return events
     }
     
     private fun deduplicateEvents(events: List<DetectedEvent>): List<DetectedEvent> {
@@ -323,5 +374,238 @@ class EventDetector {
     private fun formatDateTime(calendar: Calendar): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         return sdf.format(calendar.time)
+    }
+    
+    // ===== HEBREW EVENT DETECTION METHODS =====
+    
+    private fun detectHebrewTimeBasedEvents(line: String): List<DetectedEvent> {
+        val events = mutableListOf<DetectedEvent>()
+        
+        // Hebrew time patterns: "בשעה 3", "ב-15:00", "בערב", "בבוקר"
+        val hebrewTimePatterns = listOf(
+            Pattern.compile("בשעה\\s+(\\d{1,2}):?(\\d{0,2})", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("ב-(\\d{1,2}):(\\d{2})", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("\\b(\\d{1,2}):?(\\d{0,2})\\s*(?=בערב|בבוקר|בצהריים)", Pattern.CASE_INSENSITIVE)
+        )
+        
+        for (pattern in hebrewTimePatterns) {
+            val matcher = pattern.matcher(line)
+            while (matcher.find()) {
+                val timeStr = matcher.group()
+                val dateTime = parseHebrewTime(timeStr, line)
+                
+                if (dateTime != null) {
+                    val activity = extractHebrewActivityNearTime(line, matcher.start(), matcher.end())
+                    val title = if (activity.isNotEmpty()) activity else "אירוע" // "Event" in Hebrew
+                    
+                    events.add(DetectedEvent(
+                        title = title,
+                        description = line.trim(),
+                        dateTime = dateTime,
+                        confidence = 0.8f
+                    ))
+                    
+                    Log.d(TAG, "Found Hebrew time-based event: $title at ${formatDateTime(dateTime)}")
+                }
+            }
+        }
+        
+        return events
+    }
+    
+    private fun detectHebrewDayBasedEvents(line: String): List<DetectedEvent> {
+        val events = mutableListOf<DetectedEvent>()
+        
+        // Hebrew day patterns: "מחר", "היום", Hebrew day names
+        val hebrewDayPatterns = listOf(
+            "\\b(מחר)\\b" to 1,           // tomorrow
+            "\\b(היום)\\b" to 0,          // today
+            "\\b(יום ראשון)\\b" to -1,    // Sunday
+            "\\b(יום שני)\\b" to -1,      // Monday
+            "\\b(יום שלישי)\\b" to -1,    // Tuesday
+            "\\b(יום רביעי)\\b" to -1,    // Wednesday
+            "\\b(יום חמישי)\\b" to -1,    // Thursday
+            "\\b(יום שישי)\\b" to -1,     // Friday
+            "\\b(שבת)\\b" to -1           // Saturday
+        )
+        
+        for ((pattern, daysOffset) in hebrewDayPatterns) {
+            val regex = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+            val matcher = regex.matcher(line)
+            
+            while (matcher.find()) {
+                val dayStr = matcher.group()
+                val dateTime = parseHebrewDay(dayStr, daysOffset)
+                
+                if (dateTime != null) {
+                    val activity = extractHebrewActivityNearDay(line, matcher.start(), matcher.end())
+                    val title = if (activity.isNotEmpty()) activity else "אירוע ב$dayStr" // "Event on [day]"
+                    
+                    events.add(DetectedEvent(
+                        title = title,
+                        description = line.trim(),
+                        dateTime = dateTime,
+                        confidence = 0.7f
+                    ))
+                    
+                    Log.d(TAG, "Found Hebrew day-based event: $title on ${formatDateTime(dateTime)}")
+                }
+            }
+        }
+        
+        return events
+    }
+    
+    private fun detectHebrewActivityBasedEvents(line: String): List<DetectedEvent> {
+        val events = mutableListOf<DetectedEvent>()
+        
+        // Hebrew activity patterns
+        val hebrewActivityPatterns = listOf(
+            "\\b(פגישה|ישיבה)\\b" to "פגישה",        // meeting
+            "\\b(ארוחת ערב)\\b" to "ארוחת ערב",      // dinner
+            "\\b(ארוחת צהריים)\\b" to "ארוחת צהריים", // lunch
+            "\\b(ארוחת בוקר)\\b" to "ארוחת בוקר",    // breakfast
+            "\\b(קפה)\\b" to "קפה",                // coffee
+            "\\b(רופא|רופא שיניים)\\b" to "תור אצל רופא", // doctor/dentist appointment
+            "\\b(שיחה|טלפון)\\b" to "שיחת טלפון",    // phone call
+            "\\b(מסיבה|חגיגה)\\b" to "מסיבה",       // party
+            "\\b(סרט|קולנוע)\\b" to "סרט"           // movie
+        )
+        
+        for ((pattern, activityType) in hebrewActivityPatterns) {
+            val regex = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+            val matcher = regex.matcher(line)
+            
+            while (matcher.find()) {
+                // Only create event if we can find some Hebrew time reference in the line
+                if (hasHebrewTimeReference(line)) {
+                    events.add(DetectedEvent(
+                        title = activityType,
+                        description = line.trim(),
+                        dateTime = null, // Will be inferred later
+                        confidence = 0.6f
+                    ))
+                    
+                    Log.d(TAG, "Found Hebrew activity-based event: $activityType")
+                }
+            }
+        }
+        
+        return events
+    }
+    
+    private fun hasHebrewTimeReference(line: String): Boolean {
+        val hebrewTimeReferences = listOf(
+            "מחר", "היום", "בערב", "בבוקר", "בצהריים", "בלילה",
+            "יום ראשון", "יום שני", "יום שלישי", "יום רביעי", 
+            "יום חמישי", "יום שישי", "שבת", "מאוחר יותר", "בקרוב"
+        )
+        
+        return hebrewTimeReferences.any { ref -> line.contains(ref, ignoreCase = true) }
+    }
+    
+    private fun parseHebrewTime(timeStr: String, fullLine: String): Calendar? {
+        try {
+            val calendar = Calendar.getInstance()
+            
+            // Extract numbers from Hebrew time string
+            val numberRegex = Regex("\\d{1,2}:?\\d{0,2}")
+            val timeMatch = numberRegex.find(timeStr)
+            
+            if (timeMatch != null) {
+                val cleanTime = timeMatch.value
+                val timeFormats = listOf(
+                    "H:mm", "H", "HH:mm", "HH"
+                )
+                
+                for (format in timeFormats) {
+                    try {
+                        val sdf = SimpleDateFormat(format, Locale.getDefault())
+                        val time = sdf.parse(cleanTime)
+                        if (time != null) {
+                            val timeCalendar = Calendar.getInstance()
+                            timeCalendar.time = time
+                            
+                            calendar.set(Calendar.HOUR_OF_DAY, timeCalendar.get(Calendar.HOUR_OF_DAY))
+                            calendar.set(Calendar.MINUTE, timeCalendar.get(Calendar.MINUTE))
+                            calendar.set(Calendar.SECOND, 0)
+                            
+                            // Adjust for Hebrew time context
+                            if (fullLine.contains("בערב")) {
+                                if (calendar.get(Calendar.HOUR_OF_DAY) < 12) {
+                                    calendar.add(Calendar.HOUR_OF_DAY, 12)
+                                }
+                            } else if (fullLine.contains("בבוקר")) {
+                                if (calendar.get(Calendar.HOUR_OF_DAY) > 12) {
+                                    calendar.add(Calendar.HOUR_OF_DAY, -12)
+                                }
+                            }
+                            
+                            return calendar
+                        }
+                    } catch (e: Exception) {
+                        // Try next format
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse Hebrew time: $timeStr")
+        }
+        
+        return null
+    }
+    
+    private fun parseHebrewDay(dayStr: String, daysOffset: Int): Calendar? {
+        var calendar = Calendar.getInstance()
+        
+        when {
+            daysOffset >= 0 -> {
+                calendar.add(Calendar.DAY_OF_YEAR, daysOffset)
+            }
+            dayStr.contains("יום ראשון", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.SUNDAY)
+            }
+            dayStr.contains("יום שני", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.MONDAY)
+            }
+            dayStr.contains("יום שלישי", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.TUESDAY)
+            }
+            dayStr.contains("יום רביעי", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.WEDNESDAY)
+            }
+            dayStr.contains("יום חמישי", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.THURSDAY)
+            }
+            dayStr.contains("יום שישי", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.FRIDAY)
+            }
+            dayStr.contains("שבת", ignoreCase = true) -> {
+                calendar = getNextDayOfWeek(Calendar.SATURDAY)
+            }
+        }
+        
+        return calendar
+    }
+    
+    private fun extractHebrewActivityNearTime(line: String, timeStart: Int, timeEnd: Int): String {
+        // Look for Hebrew activity keywords before and after the time mention
+        val beforeTime = line.substring(0, timeStart).lowercase()
+        val afterTime = line.substring(timeEnd).lowercase()
+        
+        val hebrewActivities = listOf("פגישה", "ארוחת ערב", "ארוחת צהריים", "קפה", "רופא", "שיחה")
+        
+        for (activity in hebrewActivities) {
+            if (beforeTime.contains(activity) || afterTime.contains(activity)) {
+                return activity
+            }
+        }
+        
+        return ""
+    }
+    
+    private fun extractHebrewActivityNearDay(line: String, dayStart: Int, dayEnd: Int): String {
+        // Similar logic for Hebrew day-based events
+        return extractHebrewActivityNearTime(line, dayStart, dayEnd)
     }
 }

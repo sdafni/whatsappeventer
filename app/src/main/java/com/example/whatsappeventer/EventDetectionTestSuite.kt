@@ -424,6 +424,37 @@ class EventDetectionTestSuite {
                     ),
                     difficulty = TestDifficulty.MEDIUM,
                     description = "Very short time-only message"
+                ),
+                
+                // ===== HEBREW TESTS =====
+                EventTestCase(
+                    name = "hebrew_meeting_time",
+                    conversation = "פגישה מחר בשעה 15:00",
+                    expectedEvents = listOf(
+                        ExpectedEvent("פגישה", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.EASY,
+                    description = "Hebrew meeting with explicit time (Meeting tomorrow at 15:00)"
+                ),
+                
+                EventTestCase(
+                    name = "hebrew_dinner_today",
+                    conversation = "ארוחת ערב היום בשעה 7 בערב",
+                    expectedEvents = listOf(
+                        ExpectedEvent("ארוחת ערב", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.EASY,
+                    description = "Hebrew dinner with time context (Dinner today at 7 in the evening)"
+                ),
+                
+                EventTestCase(
+                    name = "hebrew_dentist_appointment",
+                    conversation = "רופא שיניים יום חמישי בשעה 10",
+                    expectedEvents = listOf(
+                        ExpectedEvent("תור אצל רופא", hasDateTime = true, minConfidence = 0.7f)
+                    ),
+                    difficulty = TestDifficulty.EASY,
+                    description = "Hebrew dentist appointment on specific day (Dentist Thursday at 10)"
                 )
             )
         }
