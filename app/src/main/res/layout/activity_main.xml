@@ -49,4 +49,42 @@
         android:text="Status: Ready"
         android:layout_marginTop="32dp" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="32dp"
+        android:gravity="center">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Event Detection Testing"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/btnRunQuickTest"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:text="Run Quick Test"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnRunFullTest"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:text="Run Full Test Suite"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnShowTestCases"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:text="Show Test Cases"
+            android:layout_marginBottom="8dp" />
+
+    </LinearLayout>
+
 </LinearLayout> 

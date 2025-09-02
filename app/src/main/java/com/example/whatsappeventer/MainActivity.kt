@@ -21,6 +21,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnAccessibilityPermission: Button
     private lateinit var tvStatus: TextView
     
+    // Test buttons
+    private lateinit var btnRunQuickTest: Button
+    private lateinit var btnRunFullTest: Button
+    private lateinit var btnShowTestCases: Button
+    
     private var isOverlayRunning = false
     
     companion object {
@@ -44,6 +49,11 @@ class MainActivity : AppCompatActivity() {
         btnUsageStatsPermission = findViewById(R.id.btnUsageStatsPermission)
         btnAccessibilityPermission = findViewById(R.id.btnAccessibilityPermission)
         tvStatus = findViewById(R.id.tvStatus)
+        
+        // Test buttons
+        btnRunQuickTest = findViewById(R.id.btnRunQuickTest)
+        btnRunFullTest = findViewById(R.id.btnRunFullTest)
+        btnShowTestCases = findViewById(R.id.btnShowTestCases)
     }
     
     private fun setupClickListeners() {
@@ -65,6 +75,19 @@ class MainActivity : AppCompatActivity() {
         
         btnAccessibilityPermission.setOnClickListener {
             requestAccessibilityPermission()
+        }
+        
+        // Test button listeners
+        btnRunQuickTest.setOnClickListener {
+            runQuickTest()
+        }
+        
+        btnRunFullTest.setOnClickListener {
+            runFullTest()
+        }
+        
+        btnShowTestCases.setOnClickListener {
+            showTestCases()
         }
     }
     
@@ -238,5 +261,27 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         checkPermissions()
         checkServiceStatus()
+    }
+    
+    // Test methods
+    private fun runQuickTest() {
+        android.util.Log.i("MainActivity", "Running quick event detection test...")
+        
+        val tester = EventDetectionTester(this)
+        tester.runQuickTest()
+    }
+    
+    private fun runFullTest() {
+        android.util.Log.i("MainActivity", "Running full event detection test suite...")
+        
+        val tester = EventDetectionTester(this)
+        tester.runFullTestSuite()
+    }
+    
+    private fun showTestCases() {
+        android.util.Log.i("MainActivity", "Showing all test cases...")
+        
+        val tester = EventDetectionTester(this)
+        tester.showTestCaseList()
     }
 } 
