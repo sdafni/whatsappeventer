@@ -1,6 +1,7 @@
 package com.example.whatsappeventer
 
 import org.json.JSONObject
+import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -8,7 +9,9 @@ class EventToCalendarMapper {
     
     companion object {
         private const val TAG = "EventToCalendarMapper"
-        private val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
+        private val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).apply {
+            timeZone = TimeZone.getDefault()
+        }
         
         fun convertEventsToCalendarJson(events: List<DetectedEvent>): String {
             android.util.Log.d(TAG, "Converting ${events.size} events to calendar JSON")
@@ -18,12 +21,12 @@ class EventToCalendarMapper {
                 return "{\n  \"message\": \"No events detected\"\n}"
             }
             
-            val eventsArray = mutableListOf<JSONObject>()
+            val eventsArray = JSONArray()
             
             events.forEachIndexed { index, event ->
                 android.util.Log.d(TAG, "Converting event $index: ${event.title}")
                 val calendarEvent = convertEventToCalendarJson(event)
-                eventsArray.add(calendarEvent)
+                eventsArray.put(calendarEvent)
             }
             
             val result = JSONObject()
@@ -86,7 +89,9 @@ class EventToCalendarMapper {
         }
         
         private fun formatDateTime(calendar: Calendar): String {
-            return dateTimeFormat.format(calendar.time)
+            val formatted = dateTimeFormat.format(calendar.time)
+            android.util.Log.d(TAG, "Formatted datetime: $formatted")
+            return formatted
         }
         
         private fun getDeviceTimeZone(): String {

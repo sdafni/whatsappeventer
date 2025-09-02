@@ -80,6 +80,11 @@ class CalendarIntegrationTestRunner(
             val validation = calendarValidator.validateCalendarJson(calendarJson)
             Log.d(TAG, "JSON validation: valid=${validation.isValid}, score=${validation.score}")
             
+            if (!validation.isValid) {
+                Log.d(TAG, "JSON validation errors for ${testCase.name}: ${validation.errors}")
+                Log.d(TAG, "Generated JSON: ${calendarJson.take(200)}...")
+            }
+            
             // 4. Evaluate overall result
             val (passed, score, details) = evaluateCalendarIntegration(
                 testCase, detectedEvents, validation

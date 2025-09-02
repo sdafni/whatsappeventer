@@ -269,14 +269,19 @@ class CalendarJsonValidator {
         // Validate datetime format
         if (hasDateTime) {
             val dateTimeStr = dateTimeObj.getString("dateTime")
+            Log.d(TAG, "Validating datetime: '$dateTimeStr' for field $fieldName")
+            
             if (!ISO8601_PATTERN.matches(dateTimeStr)) {
-                errors.add("$fieldName.dateTime format invalid. Expected ISO 8601 format (yyyy-MM-ddTHH:mm:ss±HH:mm)")
+                Log.d(TAG, "DateTime '$dateTimeStr' failed regex pattern match")
+                errors.add("$fieldName.dateTime format invalid. Expected ISO 8601 format (yyyy-MM-ddTHH:mm:ss±HH:mm), got: '$dateTimeStr'")
             } else {
                 // Try to parse the datetime
                 try {
                     val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
                     format.parse(dateTimeStr)
+                    Log.d(TAG, "DateTime '$dateTimeStr' parsed successfully")
                 } catch (e: Exception) {
+                    Log.d(TAG, "DateTime '$dateTimeStr' parsing failed: ${e.message}")
                     errors.add("$fieldName.dateTime cannot be parsed: ${e.message}")
                 }
             }
