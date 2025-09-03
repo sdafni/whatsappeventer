@@ -33,6 +33,7 @@ class OverlayService : Service() {
     private lateinit var handler: Handler
     
     private var isOverlayVisible = false
+    private var isButtonLoading = false
     private var initialX = 0
     private var initialY = 0
     private var initialTouchX = 0f
@@ -215,6 +216,11 @@ class OverlayService : Service() {
             windowManager.addView(overlayView, params)
             isOverlayVisible = true
             android.util.Log.d("OverlayService", "Overlay button created and visible!")
+            
+            // Ensure button appearance matches its state
+            if (isButtonLoading) {
+                ensureButtonLooksLoading()
+            }
         } catch (e: Exception) {
             android.util.Log.e("OverlayService", "Error creating overlay: ${e.message}")
             e.printStackTrace()
@@ -237,17 +243,84 @@ class OverlayService : Service() {
         
         view.setOnTouchListener { v, event ->
             android.util.Log.d("OverlayService", "Touch event received: action=${event.action}, x=${event.x}, y=${event.y}")
-            android.util.Log.d("OverlayService", "Any touch triggers click!")
-            onOverlayButtonClick()
+            
+            // ALWAYS ensure button looks correct for its current state
+            if (isButtonLoading) {
+                ensureButtonLooksLoading()
+            }
+            
+            // Handle different touch actions
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    // Only allow clicks if button is not in loading state
+                    if (!isButtonLoading) {
+                        android.util.Log.d("OverlayService", "Button not loading, allowing click!")
+                        onOverlayButtonClick()
+                    } else {
+                        android.util.Log.d("OverlayService", "Button is loading, ignoring click!")
+                    }
+                }
+                android.view.MotionEvent.ACTION_MOVE, android.view.MotionEvent.ACTION_UP -> {
+                    // These events are handled above - button appearance is already ensured
+                }
+            }
             true
         }
         
         android.util.Log.d("OverlayService", "Touch listener setup complete")
     }
     
-    private fun onOverlayButtonClick() {
+        private fun onOverlayButtonClick() {
         android.util.Log.d("OverlayService", "Overlay button clicked - extracting events from current conversation")
-        extractEventsFromCurrentConversation()
+        
+        // IMMEDIATELY turn button gray and set loading state (synchronous)
+        overlayView?.let { view ->
+            val imageView = view.findViewById<android.widget.ImageView>(R.id.overlay_button_image)
+            if (imageView != null) {
+                // Turn gray immediately - no delay
+                imageView.setColorFilter(android.graphics.Color.parseColor("#757575"), android.graphics.PorterDuff.Mode.SRC_IN)
+                imageView.alpha = 0.8f
+                android.util.Log.d("OverlayService", "Button turned gray immediately")
+            }
+        }
+        
+        // Set button to loading state
+        isButtonLoading = true
+        android.util.Log.d("OverlayService", "Button set to loading state")
+        
+        // Now start the animation and processing
+        try {
+            android.util.Log.d("OverlayService", "Starting button animation...")
+            overlayView?.let { view ->
+                android.util.Log.d("OverlayService", "Overlay view found, loading animation...")
+                val animation = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.button_click)
+                if (animation != null) {
+                    android.util.Log.d("OverlayService", "Animation loaded successfully, starting...")
+                    
+                    // Button is already gray, just start animation
+                    view.startAnimation(animation)
+                    android.util.Log.d("OverlayService", "Animation started!")
+                    
+                    // Wait for animation to complete before showing modal
+                    android.util.Log.d("OverlayService", "Waiting for animation to complete...")
+                    handler.postDelayed({
+                        android.util.Log.d("OverlayService", "Animation completed, now extracting events...")
+                        extractEventsFromCurrentConversation()
+                    }, 200) // Wait 200ms for the full animation
+                    
+                } else {
+                    android.util.Log.e("OverlayService", "Failed to load animation - animation is null")
+                    extractEventsFromCurrentConversation()
+                }
+            } ?: run {
+                android.util.Log.e("OverlayService", "Overlay view is null, cannot animate")
+                extractEventsFromCurrentConversation()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error during animation: ${e.message}")
+            e.printStackTrace()
+            extractEventsFromCurrentConversation()
+        }
     }
     
     private fun extractEventsFromCurrentConversation() {
@@ -354,10 +427,60 @@ class OverlayService : Service() {
                 windowManager.removeView(modal)
                 modalWindow = null
                 android.util.Log.d("OverlayService", "Events modal hidden successfully")
+                
+                // Restore button to normal state after modal is dismissed
+                restoreButtonToNormalState()
+                
             } catch (e: Exception) {
                 android.util.Log.e("OverlayService", "Error hiding modal: ${e.message}")
                 modalWindow = null
+                
+                // Also restore button state on error
+                restoreButtonToNormalState()
             }
+        }
+    }
+    
+    private fun ensureButtonLooksLoading() {
+        try {
+            overlayView?.let { view ->
+                val imageView = view.findViewById<android.widget.ImageView>(R.id.overlay_button_image)
+                if (imageView != null) {
+                    // Force the button to look gray if it's in loading state
+                    imageView.setColorFilter(android.graphics.Color.parseColor("#757575"), android.graphics.PorterDuff.Mode.SRC_IN)
+                    imageView.alpha = 0.8f
+                    android.util.Log.d("OverlayService", "Button appearance forced to loading state")
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error ensuring button looks loading: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    private fun restoreButtonToNormalState() {
+        try {
+            android.util.Log.d("OverlayService", "Restoring button to normal state...")
+            
+            overlayView?.let { view ->
+                val imageView = view.findViewById<android.widget.ImageView>(R.id.overlay_button_image)
+                if (imageView != null) {
+                    // Remove gray tint and restore original appearance
+                    imageView.clearColorFilter()
+                    imageView.alpha = 0.6f // Restore to original alpha from layout
+                    android.util.Log.d("OverlayService", "Button appearance restored")
+                }
+            }
+            
+            // Reset loading state
+            isButtonLoading = false
+            android.util.Log.d("OverlayService", "Button loading state reset to false")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayService", "Error restoring button state: ${e.message}")
+            e.printStackTrace()
+            // Ensure loading state is reset even on error
+            isButtonLoading = false
         }
     }
     
