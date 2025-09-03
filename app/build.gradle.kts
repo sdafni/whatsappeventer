@@ -33,6 +33,18 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    
+    packagingOptions {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
+    }
 }
 
 dependencies {
@@ -42,6 +54,17 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     // OCR dependency
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+    
+    // Google Sign-In and Calendar API dependencies
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.oauth-client:google-oauth-client-jetty:1.34.1")
+    implementation("com.google.apis:google-api-services-calendar:v3-rev20231215-2.0.0")
+    implementation("com.google.http-client:google-http-client-gson:1.44.1")
+    implementation("com.google.http-client:google-http-client-android:1.44.1")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

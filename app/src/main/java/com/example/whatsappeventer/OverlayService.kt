@@ -332,7 +332,8 @@ class OverlayService : Service() {
             
             if (conversationText.isNullOrEmpty()) {
                 android.util.Log.w("OverlayService", "No conversation text available from AccessibilityService")
-                showEventsModal("No conversation text found. Make sure accessibility service is enabled.", emptyList())
+                showErrorToast("No conversation text found. Make sure accessibility service is enabled.")
+                restoreButtonToNormalState()
                 return
             }
             
@@ -343,102 +344,90 @@ class OverlayService : Service() {
             val detectedEvents = eventDetector.detectEvents(conversationText)
             
             android.util.Log.d("OverlayService", "Detected ${detectedEvents.size} events")
-            showEventsModal(conversationText, detectedEvents)
+            
+            if (detectedEvents.isEmpty()) {
+                android.util.Log.w("OverlayService", "No events detected in conversation")
+                showErrorToast("No calendar events found in this conversation.")
+                restoreButtonToNormalState()
+                return
+            }
+            
+            // Show the first detected event in calendar dialog
+            val firstEvent = detectedEvents.first()
+            showCalendarEventDialog(firstEvent)
             
         } catch (e: Exception) {
             android.util.Log.e("OverlayService", "Error extracting events from conversation: ${e.message}")
             e.printStackTrace()
-            showEventsModal("Error extracting events: ${e.message}", emptyList())
+            showErrorToast("Error extracting events: ${e.message}")
+            restoreButtonToNormalState()
         }
     }
     
-    private var modalWindow: View? = null
+    private var calendarDialog: CalendarEventDialog? = null
     
-    private fun showEventsModal(conversationText: String, events: List<DetectedEvent>) {
-        android.util.Log.d("OverlayService", "=== SHOWING EVENTS MODAL ===")
-        android.util.Log.d("OverlayService", "Events count: ${events.size}")
-        android.util.Log.d("OverlayService", "Conversation text length: ${conversationText.length}")
-        
+    private fun showCalendarEventDialog(detectedEvent: DetectedEvent) {
         try {
-            // Hide any existing modal first
-            hideEventsModal()
+            android.util.Log.d("OverlayService", "=== SHOWING CALENDAR EVENT DIALOG ===")
+            android.util.Log.d("OverlayService", "Event: ${detectedEvent.title}")
             
-            android.util.Log.d("OverlayService", "Step 1: Inflating dialog layout...")
-            // Create dialog with custom layout
-            val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_calendar_events, null)
-            android.util.Log.d("OverlayService", "Step 1: Layout inflated successfully")
+            // Hide any existing dialog first
+            hideCalendarDialog()
             
-            android.util.Log.d("OverlayService", "Step 2: Finding views...")
-            val tvEventsJson = dialogView.findViewById<TextView>(R.id.tvEventsJson)
-            val btnOk = dialogView.findViewById<Button>(R.id.btnOk)
-            android.util.Log.d("OverlayService", "Step 2: Views found - TextView: $tvEventsJson, Button: $btnOk")
+            // Create new calendar dialog
+            calendarDialog = CalendarEventDialog(this, windowManager)
+            calendarDialog?.setOnDialogDismissListener(object : CalendarEventDialog.OnDialogDismissListener {
+                override fun onDialogDismiss() {
+                    android.util.Log.d("OverlayService", "Calendar dialog dismissed")
+                    hideCalendarDialog()
+                    restoreButtonToNormalState()
+                }
+                
+                override fun onEventCreated(success: Boolean, message: String) {
+                    android.util.Log.d("OverlayService", "Event creation result: $success - $message")
+                    if (success) {
+                        showSuccessToast(message)
+                    } else {
+                        showErrorToast(message)
+                    }
+                }
+            })
             
-            android.util.Log.d("OverlayService", "Step 3: Generating calendar JSON...")
-            // Generate calendar JSON
-            val calendarJson = EventToCalendarMapper.convertEventsToCalendarJson(events)
-            android.util.Log.d("OverlayService", "Step 3: Calendar JSON generated, length: ${calendarJson.length}")
-            android.util.Log.d("OverlayService", "JSON Preview: ${calendarJson.take(200)}...")
-            
-            tvEventsJson.text = calendarJson
-            android.util.Log.d("OverlayService", "Step 4: JSON text set to TextView")
-            
-            // Set up OK button
-            btnOk.setOnClickListener {
-                android.util.Log.d("OverlayService", "OK button clicked - dismissing modal")
-                hideEventsModal()
-            }
-            android.util.Log.d("OverlayService", "Step 5: OK button listener set")
-            
-            android.util.Log.d("OverlayService", "Step 6: Creating window layout params...")
-            // Create window layout params for overlay dialog
-            val dialogParams = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                } else {
-                    WindowManager.LayoutParams.TYPE_PHONE
-                },
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.CENTER
-            }
-            android.util.Log.d("OverlayService", "Step 6: Window layout params created")
-            
-            android.util.Log.d("OverlayService", "Step 7: Adding modal to window manager...")
-            windowManager.addView(dialogView, dialogParams)
-            modalWindow = dialogView
-            android.util.Log.d("OverlayService", "✅ SUCCESS: Events modal displayed with ${events.size} events")
+            // Show the dialog
+            calendarDialog?.show(detectedEvent)
+            android.util.Log.d("OverlayService", "✅ SUCCESS: Calendar dialog displayed")
             
         } catch (e: Exception) {
-            android.util.Log.e("OverlayService", "❌ ERROR showing events modal: ${e.message}")
-            android.util.Log.e("OverlayService", "❌ ERROR stack trace:", e)
+            android.util.Log.e("OverlayService", "❌ ERROR showing calendar dialog: ${e.message}")
             e.printStackTrace()
-            // Fallback to toast if dialog fails
-            Toast.makeText(this, "Modal error: ${e.message}", Toast.LENGTH_LONG).show()
+            showErrorToast("Failed to open calendar dialog: ${e.message}")
+            restoreButtonToNormalState()
         }
     }
     
-    private fun hideEventsModal() {
-        modalWindow?.let { modal ->
+    private fun hideCalendarDialog() {
+        calendarDialog?.let { dialog ->
             try {
-                android.util.Log.d("OverlayService", "Hiding events modal...")
-                windowManager.removeView(modal)
-                modalWindow = null
-                android.util.Log.d("OverlayService", "Events modal hidden successfully")
-                
-                // Restore button to normal state after modal is dismissed
-                restoreButtonToNormalState()
+                android.util.Log.d("OverlayService", "Hiding calendar dialog...")
+                // The dialog handles its own cleanup
+                calendarDialog = null
+                android.util.Log.d("OverlayService", "Calendar dialog hidden successfully")
                 
             } catch (e: Exception) {
-                android.util.Log.e("OverlayService", "Error hiding modal: ${e.message}")
-                modalWindow = null
-                
-                // Also restore button state on error
-                restoreButtonToNormalState()
+                android.util.Log.e("OverlayService", "Error hiding calendar dialog: ${e.message}")
+                calendarDialog = null
             }
         }
+    }
+    
+    private fun showSuccessToast(message: String) {
+        android.util.Log.d("OverlayService", "Showing success toast: $message")
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+    
+    private fun showErrorToast(message: String) {
+        android.util.Log.e("OverlayService", "Showing error toast: $message")
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
     
     private fun ensureButtonLooksLoading() {
@@ -490,7 +479,7 @@ class OverlayService : Service() {
         if (isOverlayVisible) {
             hideOverlay()
         }
-        hideEventsModal()
+        hideCalendarDialog()
         handler.removeCallbacksAndMessages(null)
     }
 } 

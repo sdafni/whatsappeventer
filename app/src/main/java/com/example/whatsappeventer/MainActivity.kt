@@ -8,10 +8,20 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
 import android.content.ComponentName
 import android.text.TextUtils
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import android.util.Log
 
 class MainActivity : AppCompatActivity() {
     
@@ -19,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOverlayPermission: Button
     private lateinit var btnUsageStatsPermission: Button
     private lateinit var btnAccessibilityPermission: Button
+    private lateinit var btnGoogleSignIn: Button
     private lateinit var tvStatus: TextView
     
     // Test buttons
@@ -28,8 +39,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnShowTestCases: Button
     
     private var isOverlayRunning = false
+    private lateinit var googleSignInManager: GoogleSignInManager
+    private lateinit var signInLauncher: ActivityResultLauncher<Intent>
     
     companion object {
+        private const val TAG = "MainActivity"
         private const val OVERLAY_PERMISSION_REQUEST_CODE = 1234
         private const val USAGE_STATS_PERMISSION_REQUEST_CODE = 5678
         private const val ACCESSIBILITY_PERMISSION_REQUEST_CODE = 3456
@@ -39,9 +53,30 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
+        initGoogleSignIn()
         initViews()
         setupClickListeners()
         checkPermissions()
+    }
+    
+    private fun initGoogleSignIn() {
+        googleSignInManager = GoogleSignInManager.getInstance(this)
+        
+        // Initialize sign-in launcher
+        signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            try {
+                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                val account = task.getResult(ApiException::class.java)
+                Log.d(TAG, "Sign in successful: ${account.email}")
+                googleSignInManager.handleSignInResult(account)
+                updateGoogleSignInButton()
+                Toast.makeText(this, "✅ Signed in successfully", Toast.LENGTH_SHORT).show()
+            } catch (e: ApiException) {
+                Log.w(TAG, "Sign in failed: ${e.statusCode}")
+                Toast.makeText(this, "❌ Sign in failed: ${e.message}", Toast.LENGTH_LONG).show()
+                updateGoogleSignInButton()
+            }
+        }
     }
     
     private fun initViews() {
@@ -49,6 +84,7 @@ class MainActivity : AppCompatActivity() {
         btnOverlayPermission = findViewById(R.id.btnOverlayPermission)
         btnUsageStatsPermission = findViewById(R.id.btnUsageStatsPermission)
         btnAccessibilityPermission = findViewById(R.id.btnAccessibilityPermission)
+        btnGoogleSignIn = findViewById(R.id.btnGoogleSignIn)
         tvStatus = findViewById(R.id.tvStatus)
         
         // Test buttons
@@ -77,6 +113,10 @@ class MainActivity : AppCompatActivity() {
         
         btnAccessibilityPermission.setOnClickListener {
             requestAccessibilityPermission()
+        }
+        
+        btnGoogleSignIn.setOnClickListener {
+            handleGoogleSignInClick()
         }
         
         // Test button listeners
@@ -244,6 +284,39 @@ class MainActivity : AppCompatActivity() {
         if (hasAccessibilityPermission()) {
             btnAccessibilityPermission.text = "Accessibility Permission: Granted"
             btnAccessibilityPermission.isEnabled = false
+        }
+        
+        updateGoogleSignInButton()
+    }
+    
+    private fun handleGoogleSignInClick() {
+        if (googleSignInManager.isSignedIn()) {
+            // User is already signed in - offer to sign out
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    googleSignInManager.signOut()
+                    updateGoogleSignInButton()
+                    Toast.makeText(this@MainActivity, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Sign out error: ${e.message}")
+                    Toast.makeText(this@MainActivity, "Error signing out", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } else {
+            // Start sign-in process
+            val signInIntent = googleSignInManager.getSignInIntent()
+            signInLauncher.launch(signInIntent)
+        }
+    }
+    
+    private fun updateGoogleSignInButton() {
+        if (googleSignInManager.isSignedIn()) {
+            val account = googleSignInManager.getCurrentAccount()
+            btnGoogleSignIn.text = "Signed in as: ${account?.email ?: "Unknown"}"
+            btnGoogleSignIn.isEnabled = true
+        } else {
+            btnGoogleSignIn.text = "Sign in to Google Calendar"
+            btnGoogleSignIn.isEnabled = true
         }
     }
     
