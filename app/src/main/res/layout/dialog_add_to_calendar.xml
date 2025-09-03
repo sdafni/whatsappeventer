@@ -4,6 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp"
+    android:layout_margin="32dp"
     android:background="@drawable/dialog_background">
 
     <!-- Header -->
@@ -179,6 +180,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="12dp"
             android:text="Cancel"
+            android:textSize="16sp"
             android:textAllCaps="false" />
 
         <Button
@@ -186,6 +188,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Add to Calendar"
+            android:textSize="16sp"
             android:textAllCaps="false" />
     </LinearLayout>
 

@@ -5,6 +5,9 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import androidx.core.content.ContextCompat
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -44,6 +47,7 @@ class CalendarEventDialog(
     private var signInManager: GoogleSignInManager? = null
     private var calendarService: GoogleCalendarService? = null
     private var currentDetectedEvent: DetectedEvent? = null
+    private var signInReceiver: BroadcastReceiver? = null
     
     // Date/Time variables
     private var startDateTime = Calendar.getInstance()
@@ -106,18 +110,19 @@ class CalendarEventDialog(
             
             btnSignIn.setOnClickListener {
                 try {
-                    // Launch the main app activity with sign-in trigger
-                    val intent = Intent(context, MainActivity::class.java).apply {
+                    // Set up broadcast receiver to listen for sign-in success
+                    registerSignInReceiver()
+                    
+                    // Launch the transparent sign-in activity
+                    val intent = Intent(context, SignInActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        putExtra("trigger_signin", true)
                     }
                     context.startActivity(intent)
                     dismiss()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to open app: ${e.message}")
-                    Toast.makeText(context, "Failed to open app. Please open WhatsApp Eventer manually.", Toast.LENGTH_LONG).show()
+                    Log.e(TAG, "Failed to start sign-in: ${e.message}")
+                    Toast.makeText(context, "Failed to start sign-in.", Toast.LENGTH_LONG).show()
                     dismiss()
                 }
             }
@@ -131,6 +136,37 @@ class CalendarEventDialog(
         } catch (e: Exception) {
             Log.e(TAG, "Error showing sign-in dialog: ${e.message}")
             showError("Failed to show sign-in dialog")
+        }
+    }
+    
+    private fun registerSignInReceiver() {
+        signInReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                Log.d(TAG, "Sign-in success received, showing event dialog")
+                // Re-show the main dialog now that user is signed in
+                currentDetectedEvent?.let { event ->
+                    showEventDialog()
+                }
+                unregisterSignInReceiver()
+            }
+        }
+        
+        val filter = IntentFilter("com.example.whatsappeventer.SIGN_IN_SUCCESS")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(signInReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(signInReceiver, filter)
+        }
+    }
+    
+    private fun unregisterSignInReceiver() {
+        signInReceiver?.let { receiver ->
+            try {
+                context.unregisterReceiver(receiver)
+                signInReceiver = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering receiver: ${e.message}")
+            }
         }
     }
     
@@ -300,7 +336,7 @@ class CalendarEventDialog(
     
     private fun showDialog(view: View) {
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
+            (windowManager.defaultDisplay.width * 0.85).toInt(), // 85% of screen width
             WindowManager.LayoutParams.WRAP_CONTENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -323,6 +359,7 @@ class CalendarEventDialog(
                 windowManager.removeView(view)
                 dialogView = null
             }
+            unregisterSignInReceiver()
             onDialogDismissListener?.onDialogDismiss()
         } catch (e: Exception) {
             Log.e(TAG, "Error dismissing dialog: ${e.message}")

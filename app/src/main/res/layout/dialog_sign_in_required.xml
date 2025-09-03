@@ -4,6 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp"
+    android:layout_margin="32dp"
     android:background="@drawable/dialog_background">
 
     <!-- Header -->
@@ -62,6 +63,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="12dp"
             android:text="Cancel"
+            android:textSize="16sp"
             android:textAllCaps="false"
             style="@style/Widget.MaterialComponents.Button.TextButton" />
 
@@ -69,7 +71,8 @@
             android:id="@+id/btnSignIn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Open App"
+            android:text="Sign In"
+            android:textSize="16sp"
             android:textAllCaps="false"
             style="@style/Widget.MaterialComponents.Button" />
     </LinearLayout>
