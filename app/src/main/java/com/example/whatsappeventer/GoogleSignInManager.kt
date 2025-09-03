@@ -23,7 +23,7 @@ class GoogleSignInManager private constructor(private val context: Context) {
     
     companion object {
         private const val TAG = "GoogleSignInManager"
-        private const val SERVER_CLIENT_ID = "238877844764-59tr5rqvvcgoersb7h4albcunalgtk7c.apps.googleusercontent.com" // TODO: Replace with actual client ID
+        private const val SERVER_CLIENT_ID = "238877844764-quup152ftgdvl7hlto75a59rje7omn8j.apps.googleusercontent.com" // TODO: Replace with actual client ID
         
         @Volatile
         private var INSTANCE: GoogleSignInManager? = null
@@ -58,6 +58,7 @@ class GoogleSignInManager private constructor(private val context: Context) {
     }
     
     fun getSignInIntent(): Intent {
+        Log.d(TAG, "Creating Google Sign In intent")
         return googleSignInClient.signInIntent
     }
     

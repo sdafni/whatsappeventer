@@ -25,7 +25,8 @@
             android:layout_height="44dp"
             android:text="Start Overlay"
             android:textSize="13sp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Start the overlay service to show add event button in WhatsApp" />
 
         <Button
             android:id="@+id/btnOverlayPermission"
@@ -33,7 +34,8 @@
             android:layout_height="44dp"
             android:text="Grant Overlay Permission"
             android:textSize="13sp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Grant permission to display overlay button on other apps" />
 
         <Button
             android:id="@+id/btnUsageStatsPermission"
@@ -41,7 +43,8 @@
             android:layout_height="44dp"
             android:text="Grant Usage Stats Permission"
             android:textSize="13sp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Grant permission to detect when WhatsApp is active" />
 
         <Button
             android:id="@+id/btnAccessibilityPermission"
@@ -49,7 +52,8 @@
             android:layout_height="44dp"
             android:text="Grant Accessibility Permission"
             android:textSize="13sp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Grant accessibility permission to read WhatsApp conversation text" />
 
         <Button
             android:id="@+id/btnGoogleSignIn"
@@ -57,7 +61,8 @@
             android:layout_height="44dp"
             android:text="Sign in to Google Calendar"
             android:textSize="13sp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Sign in with Google account to add events to your calendar" />
 
         <TextView
             android:id="@+id/tvStatus"

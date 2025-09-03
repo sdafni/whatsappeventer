@@ -36,7 +36,7 @@
             android:layout_height="32dp"
             android:src="@drawable/ic_close"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Close" />
+            android:contentDescription="Close dialog" />
     </LinearLayout>
 
     <ScrollView

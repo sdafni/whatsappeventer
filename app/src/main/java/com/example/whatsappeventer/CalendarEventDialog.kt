@@ -105,9 +105,21 @@ class CalendarEventDialog(
             val btnCancelSignIn = signInView.findViewById<Button>(R.id.btnCancelSignIn)
             
             btnSignIn.setOnClickListener {
-                // For service context, we need to show a toast and ask user to open the app
-                Toast.makeText(context, "Please open the WhatsApp Eventer app to sign in to Google", Toast.LENGTH_LONG).show()
-                dismiss()
+                try {
+                    // Launch the main app activity with sign-in trigger
+                    val intent = Intent(context, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("trigger_signin", true)
+                    }
+                    context.startActivity(intent)
+                    dismiss()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to open app: ${e.message}")
+                    Toast.makeText(context, "Failed to open app. Please open WhatsApp Eventer manually.", Toast.LENGTH_LONG).show()
+                    dismiss()
+                }
             }
             
             btnCancelSignIn.setOnClickListener {

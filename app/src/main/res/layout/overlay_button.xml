@@ -13,6 +13,6 @@
         android:layout_height="72dp"
         android:layout_gravity="center"
         android:src="@drawable/addevent"
-        android:contentDescription="Add Event Button" />
+        android:contentDescription="Extract events from WhatsApp conversation and add to Google Calendar" />
 
 </FrameLayout> 

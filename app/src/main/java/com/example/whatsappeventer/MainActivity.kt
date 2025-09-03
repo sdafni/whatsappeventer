@@ -22,6 +22,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.util.Log
+import android.os.Handler
+import android.os.Looper
 
 class MainActivity : AppCompatActivity() {
     
@@ -41,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private var isOverlayRunning = false
     private lateinit var googleSignInManager: GoogleSignInManager
     private lateinit var signInLauncher: ActivityResultLauncher<Intent>
+    private val handler = Handler(Looper.getMainLooper())
     
     companion object {
         private const val TAG = "MainActivity"
@@ -57,6 +60,9 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupClickListeners()
         checkPermissions()
+        
+        // Check if this activity was launched for sign-in from overlay
+        handleOverlaySignInRequest()
     }
     
     private fun initGoogleSignIn() {
@@ -71,6 +77,13 @@ class MainActivity : AppCompatActivity() {
                 googleSignInManager.handleSignInResult(account)
                 updateGoogleSignInButton()
                 Toast.makeText(this, "✅ Signed in successfully", Toast.LENGTH_SHORT).show()
+                
+                // If sign-in was triggered from overlay, direct user to WhatsApp
+                if (intent.getBooleanExtra("trigger_signin", false)) {
+                    handler.postDelayed({
+                        openWhatsApp()
+                    }, 2000) // Give user time to see success message
+                }
             } catch (e: ApiException) {
                 Log.w(TAG, "Sign in failed: ${e.statusCode}")
                 Toast.makeText(this, "❌ Sign in failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -116,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         btnGoogleSignIn.setOnClickListener {
+            Log.d(TAG, "Google Sign In button clicked")
             handleGoogleSignInClick()
         }
         
@@ -290,7 +304,9 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun handleGoogleSignInClick() {
+        Log.d(TAG, "handleGoogleSignInClick called")
         if (googleSignInManager.isSignedIn()) {
+            Log.d(TAG, "User already signed in - showing sign out option")
             // User is already signed in - offer to sign out
             CoroutineScope(Dispatchers.Main).launch {
                 try {
@@ -303,9 +319,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
-            // Start sign-in process
-            val signInIntent = googleSignInManager.getSignInIntent()
-            signInLauncher.launch(signInIntent)
+            Log.d(TAG, "User not signed in - starting sign-in process")
+            try {
+                // Start sign-in process
+                val signInIntent = googleSignInManager.getSignInIntent()
+                Log.d(TAG, "Got sign-in intent, launching...")
+                signInLauncher.launch(signInIntent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting sign-in: ${e.message}")
+                Toast.makeText(this, "Error starting sign-in: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
     
@@ -340,6 +363,37 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         checkPermissions()
         checkServiceStatus()
+    }
+    
+    private fun handleOverlaySignInRequest() {
+        val shouldTriggerSignIn = intent.getBooleanExtra("trigger_signin", false)
+        if (shouldTriggerSignIn && !googleSignInManager.isSignedIn()) {
+            // Remove the flag to prevent triggering again
+            intent.removeExtra("trigger_signin")
+            
+            // Trigger sign-in automatically
+            Toast.makeText(this, "Please sign in to add events to Google Calendar", Toast.LENGTH_SHORT).show()
+            handler.postDelayed({
+                handleGoogleSignInClick()
+            }, 500) // Small delay to let the activity fully load
+        }
+    }
+    
+    private fun openWhatsApp() {
+        try {
+            val packageManager = packageManager
+            val intent = packageManager.getLaunchIntentForPackage("com.whatsapp")
+            if (intent != null) {
+                Toast.makeText(this, "Opening WhatsApp - look for the add event button!", Toast.LENGTH_LONG).show()
+                startActivity(intent)
+                finish() // Close the MainActivity
+            } else {
+                Toast.makeText(this, "WhatsApp not installed", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open WhatsApp: ${e.message}")
+            Toast.makeText(this, "Failed to open WhatsApp", Toast.LENGTH_SHORT).show()
+        }
     }
     
     // Test methods
